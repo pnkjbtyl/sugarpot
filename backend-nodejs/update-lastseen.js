@@ -26,7 +26,7 @@ async function updateLastSeen() {
       await User.findByIdAndUpdate(
         user._id,
         { lastSeenAt: randomDate },
-        { new: true }
+        { returnDocument: 'after' }
       );
 
       updatedCount++;

@@ -9,11 +9,27 @@ require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
+
+// Increase server timeout for large file uploads (30 minutes)
+server.timeout = 30 * 60 * 1000; // 30 minutes
+server.keepAliveTimeout = 30 * 60 * 1000; // 30 minutes
+server.headersTimeout = 31 * 60 * 1000; // 31 minutes (must be > keepAliveTimeout)
+
 const io = new Server(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
+    origin: process.env.NODE_ENV === 'production' 
+      ? ['https://sugarpot.shree.systems', 'http://sugarpot.shree.systems']
+      : "*",
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  // Allow Socket.io to work behind reverse proxy
+  allowEIO3: true,
+  // Increase buffer size for large file uploads via Socket.io
+  maxHttpBufferSize: 100 * 1024 * 1024, // 100MB
+  // Increase ping timeout for long-running operations
+  pingTimeout: 30 * 60 * 1000, // 30 minutes
+  pingInterval: 25000, // 25 seconds
 });
 
 // Create uploads directories if they don't exist
@@ -32,10 +48,24 @@ const galleryLockedThumbnailsDir = path.join(galleryLockedDir, 'thumbnails');
 });
 
 // Middleware
-app.use(cors());
+const allowedOrigins = process.env.NODE_ENV === 'production' 
+  ? ['https://sugarpot.shree.systems', 'http://sugarpot.shree.systems']
+  : '*';
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
 // Increase JSON payload limit to 50MB for image uploads (base64 encoded)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Increase request timeout for all routes (30 minutes)
+app.use((req, res, next) => {
+  req.setTimeout(30 * 60 * 1000); // 30 minutes
+  res.setTimeout(30 * 60 * 1000); // 30 minutes
+  next();
+});
 // Serve uploaded files (images and videos) with proper headers for video streaming
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res, filePath) => {

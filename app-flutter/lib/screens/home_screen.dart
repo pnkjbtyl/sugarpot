@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../providers/auth_provider.dart';
@@ -100,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             CircleAvatar(
                             radius: 60,
                             backgroundImage: NetworkImage(
-                              AppConfig.buildImageUrl(user!['profileImage']),
+                              AppConfig.getProfileThumbnailUrl(user!['profileImage']),
                             ),
                           )
                         else

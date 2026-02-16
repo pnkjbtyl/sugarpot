@@ -33,7 +33,7 @@ async function authenticateToken(req, res, next) {
       await User.findByIdAndUpdate(
         decoded.userId,
         { lastSeenAt: new Date() },
-        { new: false } // Don't return the updated document, just update it
+        { returnDocument: 'before' } // Don't return the updated document, just update it
       );
     } catch (updateError) {
       // Log error but don't block the request

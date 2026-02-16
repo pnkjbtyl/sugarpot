@@ -755,9 +755,11 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
       itemCount: mediaList.length,
       itemBuilder: (context, index) {
         final media = mediaList[index];
+        // Always use thumbnail for gallery display (fallback to full URL only if thumbnail missing)
         final thumbnailUrl = media['thumbnailUrl'] ?? media['url'];
         final mediaUrl = media['url'];
         final isVideo = media['type'] == 'video';
+        // Build full URLs - always use thumbnail for grid display
         final fullThumbnailUrl = AppConfig.buildImageUrl(thumbnailUrl);
         final fullMediaUrl = AppConfig.buildImageUrl(mediaUrl);
 

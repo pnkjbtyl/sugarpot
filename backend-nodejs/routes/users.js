@@ -349,7 +349,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.userId,
       { ...updates, updatedAt: Date.now() },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
     
     if (!user) {
@@ -389,7 +389,7 @@ router.put('/firebase-token', authenticateToken, async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.userId,
       { firebaseToken, updatedAt: Date.now() },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!user) {
@@ -650,6 +650,7 @@ router.post('/upload-gallery-media', authenticateToken, mediaUpload.fields([
   { name: 'media', maxCount: 1 },
   { name: 'thumbnail', maxCount: 1 }
 ]), async (req, res) => {
+  const startTime = Date.now();
   try {
     if (!req.files || !req.files['media'] || req.files['media'].length === 0) {
       return res.status(400).json({ message: 'No media file provided' });
@@ -663,6 +664,8 @@ router.post('/upload-gallery-media', authenticateToken, mediaUpload.fields([
       mediaSize: mediaFile.size,
       hasThumbnail: !!thumbnailFile,
       thumbnailSize: thumbnailFile ? thumbnailFile.size : 0,
+      userId: req.userId,
+      timestamp: new Date().toISOString(),
     });
 
     // Check file size
@@ -690,10 +693,14 @@ router.post('/upload-gallery-media', authenticateToken, mediaUpload.fields([
     const isVideo = mediaFile.mimetype.startsWith('video/');
 
     if (isImage) {
+      console.log('Processing image...');
       mediaData = await processAndSaveGalleryImage(mediaFile.buffer, req.userId, galleryType);
+      console.log('Image processed successfully');
     } else if (isVideo) {
+      console.log('Processing video... (this may take a while for large files)');
       // If thumbnail is provided, use it; otherwise backend will create placeholder
       mediaData = await processAndSaveGalleryVideo(mediaFile.buffer, req.userId, galleryType, thumbnailFile?.buffer);
+      console.log('Video processed successfully');
     } else {
       return res.status(400).json({ message: 'Unsupported file type' });
     }
@@ -713,7 +720,12 @@ router.post('/upload-gallery-media', authenticateToken, mediaUpload.fields([
       uploadedAt: new Date(),
     });
 
+    console.log('Saving user gallery data...');
     await user.save();
+    console.log('User gallery data saved');
+
+    const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`Media upload completed in ${processingTime} seconds`);
 
     res.json({
       message: 'Media uploaded successfully',
@@ -725,8 +737,17 @@ router.post('/upload-gallery-media', authenticateToken, mediaUpload.fields([
       },
     });
   } catch (error) {
-    console.error('Error uploading gallery media:', error);
-    res.status(500).json({ message: error.message || 'Failed to upload media' });
+    const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.error(`Error uploading gallery media (after ${processingTime}s):`, error);
+    console.error('Error stack:', error.stack);
+    
+    // Check if response was already sent
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        message: error.message || 'Failed to upload media',
+        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
   }
 });
 
