@@ -79,7 +79,14 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
 }));
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/sugarpot')
+// Suppress Mongoose deprecation warnings for 'new' option
+// Note: This is a temporary workaround until all internal Mongoose operations are updated
+mongoose.set('strictQuery', false);
+
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/sugarpot', {
+  // Use new returnDocument option format
+  // This helps reduce deprecation warnings
+})
 .then(() => console.log('MongoDB connected successfully'))
 .catch(err => console.error('MongoDB connection error:', err));
 

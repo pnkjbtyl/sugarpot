@@ -683,8 +683,9 @@ router.post('/upload-gallery-media', authenticateToken, mediaUpload.fields([
       return res.status(400).json({ message: 'Invalid gallery type. Must be "public" or "locked"' });
     }
 
-    const user = await User.findById(req.userId);
-    if (!user) {
+    // Check if user exists
+    const existingUser = await User.findById(req.userId);
+    if (!existingUser) {
       return res.status(404).json({ message: 'User not found' });
     }
 
@@ -705,23 +706,38 @@ router.post('/upload-gallery-media', authenticateToken, mediaUpload.fields([
       return res.status(400).json({ message: 'Unsupported file type' });
     }
 
-    // Add to user's gallery
-    if (!user.gallery) {
-      user.gallery = { public: [], locked: [] };
-    }
-    if (!user.gallery[galleryType]) {
-      user.gallery[galleryType] = [];
-    }
-
-    user.gallery[galleryType].push({
+    // Prepare new media item
+    const newMediaItem = {
       url: mediaData.url,
       thumbnailUrl: mediaData.thumbnailUrl,
       type: mediaData.type,
       uploadedAt: new Date(),
-    });
+    };
+
+    // Build update query using $push (MongoDB will create array if it doesn't exist)
+    // First ensure gallery structure exists if needed
+    const updateOperations = {};
+    
+    if (!existingUser.gallery) {
+      // Initialize gallery structure
+      updateOperations.$set = { gallery: { public: [], locked: [] } };
+    }
+    
+    // Push new media item to the appropriate gallery array
+    updateOperations.$push = { [`gallery.${galleryType}`]: newMediaItem };
 
     console.log('Saving user gallery data...');
-    await user.save();
+    // Use findByIdAndUpdate with returnDocument to avoid Mongoose deprecation warnings
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      updateOperations,
+      { returnDocument: 'after', runValidators: true }
+    );
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found after update' });
+    }
+    
     console.log('User gallery data saved');
 
     const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
