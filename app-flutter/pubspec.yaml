@@ -1,0 +1,42 @@
+name: sugarpot_app
+description: A Tinder-like dating app with location-based matching
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  http: ^1.1.0
+  shared_preferences: ^2.2.2
+  firebase_core: ^2.24.2
+  firebase_messaging: ^14.7.10
+  cloud_firestore: ^4.13.6
+  geolocator: ^10.1.0
+  geocoding: ^3.0.0
+  image_picker: ^1.0.7
+  cached_network_image: ^3.3.0
+  provider: ^6.1.1
+  flutter_image_compress: ^2.1.0
+  url_launcher: ^6.2.5
+  flutter_dotenv: ^5.1.0
+  video_compress: ^3.1.2
+  video_player: ^2.8.2
+  video_thumbnail: ^0.5.3
+  socket_io_client: ^2.0.3+1
+  file_picker: ^8.1.2
+  just_audio: ^0.10.5
+  rxdart: ^0.28.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
