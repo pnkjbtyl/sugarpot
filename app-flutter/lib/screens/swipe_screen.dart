@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
@@ -7,10 +8,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/match_provider.dart';
 import '../providers/location_provider.dart';
 import '../services/api_service.dart';
-import '../main.dart';
 import '../utils/config.dart';
 import 'location_selection_dialog.dart';
 import 'user_profile_details_screen.dart';
+import '../theme/app_colors.dart';
 
 class SwipeScreen extends StatefulWidget {
   const SwipeScreen({super.key});
@@ -23,6 +24,9 @@ class SwipeScreen extends StatefulWidget {
 final GlobalKey<_SwipeScreenState> swipeScreenKey = GlobalKey<_SwipeScreenState>();
 
 class _SwipeScreenState extends State<SwipeScreen> {
+  bool _isCrossLoading = false;
+  bool _isHeartLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -487,7 +491,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
                                           Icon(
                                             Icons.location_on,
                                             size: 16,
-                                            color: primaryColor,
+                                            color: context.appPrimaryColor,
                                           ),
                                           const SizedBox(width: 4),
                                           Text(
@@ -555,9 +559,22 @@ class _SwipeScreenState extends State<SwipeScreen> {
                           child: Material(
                             color: Colors.transparent,
                             child: InkWell(
-                              onTap: () {
-                                matchProvider.swipeLeft(currentUser['id'] ?? currentUser['_id']);
-                              },
+                              onTap: _isCrossLoading || _isHeartLoading
+                                  ? null
+                                  : () async {
+                                      setState(() => _isCrossLoading = true);
+                                      // Wait for loader to be painted before calling API
+                                      await SchedulerBinding.instance.endOfFrame;
+                                      if (!mounted) return;
+                                      try {
+                                        await matchProvider.swipeLeft(
+                                            currentUser['id'] ?? currentUser['_id']);
+                                      } finally {
+                                        if (mounted) {
+                                          setState(() => _isCrossLoading = false);
+                                        }
+                                      }
+                                    },
                               borderRadius: BorderRadius.circular(32),
                               child: Container(
                                 width: 64,
@@ -566,17 +583,25 @@ class _SwipeScreenState extends State<SwipeScreen> {
                                   color: Colors.red,
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(
-                                  Icons.close,
-                                  size: 32,
-                                  color: Colors.white,
-                                ),
+                                child: _isCrossLoading
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(16),
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.close,
+                                        size: 32,
+                                        color: Colors.white,
+                                      ),
                               ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 40),
-                        // Wink button
+                        // Heart button
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -592,51 +617,67 @@ class _SwipeScreenState extends State<SwipeScreen> {
                           child: Material(
                             color: Colors.transparent,
                             child: InkWell(
-                              onTap: () async {
-                                final matchProvider = Provider.of<MatchProvider>(context, listen: false);
-                                try {
-                                  final response = await matchProvider.sendHeartRequest(
-                                    currentUser['id'] ?? currentUser['_id'],
-                                  );
-                                  
-                                  if (mounted) {
-                                    if (response['match'] == true) {
-                                      _showMatchDialog(context, currentUser['name'] ?? 'User');
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Heart request sent! They\'ll see your request.'),
-                                          backgroundColor: Colors.green,
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                } catch (e) {
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Error sending heart request: ${e.toString()}'),
-                                        backgroundColor: Colors.red,
-                                        duration: const Duration(seconds: 2),
-                                      ),
-                                    );
-                                  }
-                                }
-                              },
+                              onTap: _isCrossLoading || _isHeartLoading
+                                  ? null
+                                  : () async {
+                                      setState(() => _isHeartLoading = true);
+                                      // Wait for loader to be painted before calling API
+                                      await SchedulerBinding.instance.endOfFrame;
+                                      if (!mounted) return;
+                                      try {
+                                        final response = await matchProvider.sendHeartRequest(
+                                          currentUser['id'] ?? currentUser['_id'],
+                                        );
+                                        if (mounted) {
+                                          if (response['match'] == true) {
+                                            _showMatchDialog(context, currentUser['name'] ?? 'User');
+                                          } else {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Heart request sent! They\'ll see your request.'),
+                                                backgroundColor: Colors.green,
+                                                duration: Duration(seconds: 2),
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      } catch (e) {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Error sending heart request: ${e.toString()}'),
+                                              backgroundColor: Colors.red,
+                                              duration: const Duration(seconds: 2),
+                                            ),
+                                          );
+                                        }
+                                      } finally {
+                                        if (mounted) {
+                                          setState(() => _isHeartLoading = false);
+                                        }
+                                      }
+                                    },
                               borderRadius: BorderRadius.circular(32),
                               child: Container(
                                 width: 64,
                                 height: 64,
                                 decoration: BoxDecoration(
-                                  color: primaryColor,
+                                  color: context.appPrimaryColor,
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(
-                                  Icons.favorite,
-                                  size: 32,
-                                  color: Colors.white,
-                                ),
+                                child: _isHeartLoading
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(16),
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.favorite,
+                                        size: 32,
+                                        color: Colors.white,
+                                      ),
                               ),
                             ),
                           ),

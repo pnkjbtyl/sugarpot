@@ -9,6 +9,7 @@ import 'dart:io';
 import '../providers/auth_provider.dart';
 import '../utils/auth_errors.dart';
 import 'home_screen.dart';
+import '../theme/app_colors.dart';
 import 'get_started_screen.dart';
 import '../main.dart';
 
@@ -297,9 +298,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     if (mounted) {
       if (success) {
-        // Navigate to People screen (index 1) after completing onboarding
-        Navigator.of(context).pushReplacement(
+        // Navigate to People screen (index 1) after completing onboarding. Clear stack so back won't return to login.
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomeScreen(initialIndex: 1)),
+          (route) => false,
         );
       } else {
         final error = authProvider.error ?? 'Failed to complete onboarding';
@@ -332,7 +334,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Complete Your Profile'),
-        backgroundColor: primaryColor,
+        backgroundColor: context.appPrimaryColor,
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
       ),
@@ -373,7 +375,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     : null,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: _isCurrentPageValid() ? primaryColor : Colors.grey,
+                  backgroundColor: _isCurrentPageValid() ? context.appPrimaryColor : Colors.grey,
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: Colors.grey[300],
                   disabledForegroundColor: Colors.grey[600],
@@ -427,7 +429,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: _currentPage == index
-                            ? primaryColor
+                            ? context.appPrimaryColor
                             : Colors.grey[300],
                       ),
                     );
@@ -562,27 +564,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           border: Border.all(
-            color: isSelected ? primaryColor : Colors.grey[300]!,
+            color: isSelected ? context.appPrimaryColor : Colors.grey[300]!,
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(8),
-          color: isSelected ? primaryColor.withOpacity(0.1) : Colors.white,
+          color: isSelected ? context.appPrimaryColor.withOpacity(0.1) : Colors.white,
         ),
         child: Row(
           children: [
-            Icon(icon, color: isSelected ? primaryColor : Colors.grey),
+            Icon(icon, color: isSelected ? context.appPrimaryColor : Colors.grey),
             const SizedBox(width: 16),
             Text(
               label,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? primaryColor : Colors.black,
+                color: isSelected ? context.appPrimaryColor : Colors.black,
               ),
             ),
             const Spacer(),
             if (isSelected)
-              Icon(Icons.check_circle, color: primaryColor),
+              Icon(Icons.check_circle, color: context.appPrimaryColor),
           ],
         ),
       ),
@@ -619,7 +621,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: _profileImage != null ? primaryColor : Colors.grey[300]!,
+                        color: _profileImage != null ? context.appPrimaryColor : Colors.grey[300]!,
                         width: 3,
                       ),
                       color: Colors.grey[200],

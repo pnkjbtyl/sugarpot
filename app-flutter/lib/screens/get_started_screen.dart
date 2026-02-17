@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'otp_verification_screen.dart';
 import '../main.dart';
+import '../theme/app_colors.dart';
 
 class GetStartedScreen extends StatefulWidget {
   const GetStartedScreen({super.key});
@@ -62,15 +63,15 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
                   Icon(
                     Icons.favorite,
                     size: 80,
-                    color: primaryColor,
+                    color: context.appPrimaryColor,
                   ),
                   const SizedBox(height: 20),
-                  const Text(
+                  Text(
                     'SugarPot',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
-                      color: primaryColor,
+                      color: context.appPrimaryColor,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -111,7 +112,7 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
                           onPressed: authProvider.isLoading ? null : _sendOtp,
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: primaryColor,
+                            backgroundColor: context.appPrimaryColor,
                             foregroundColor: Colors.white,
                           ),
                           child: authProvider.isLoading

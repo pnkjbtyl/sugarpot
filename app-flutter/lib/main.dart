@@ -11,9 +11,12 @@ import 'providers/auth_provider.dart';
 import 'providers/match_provider.dart';
 import 'providers/location_provider.dart';
 import 'services/firebase_service.dart';
+import 'theme/app_colors.dart';
 
-// Primary color constant
-const Color primaryColor = Color(0xFFa872be);
+// Default color constants (used when theme extension is not available, e.g. fallback)
+const Color primaryColor = Color(0xFFab76e3);
+const Color secondaryColor = Color.fromARGB(255, 238, 222, 255);
+const Color tertiaryColor = Color.fromARGB(255, 245, 236, 255);
 
 // Background message handler (must be top-level function)
 @pragma('vm:entry-point')
@@ -41,6 +44,29 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  static ThemeData _buildTheme(AppColors colors) {
+    return ThemeData(
+      primaryColor: colors.primary,
+      extensions: [colors],
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: colors.primary,
+        primary: colors.primary,
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: colors.primary,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: colors.primary,
+          foregroundColor: Colors.white,
+        ),
+      ),
+      useMaterial3: true,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -49,34 +75,21 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MatchProvider()),
         ChangeNotifierProvider(create: (_) => LocationProvider()),
       ],
-      child: MaterialApp(
-        title: 'SugarPot',
-        theme: ThemeData(
-          primaryColor: primaryColor,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: primaryColor,
-            primary: primaryColor,
-          ),
-          appBarTheme: const AppBarTheme(
-            backgroundColor: primaryColor,
-            foregroundColor: Colors.white,
-            iconTheme: IconThemeData(color: Colors.white),
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              foregroundColor: Colors.white,
-            ),
-          ),
-          useMaterial3: true,
-        ),
-        home: const SplashScreen(),
-        routes: {
-          '/get-started': (context) => const GetStartedScreen(),
-          '/onboarding': (context) => const OnboardingScreen(),
-          '/home': (context) => const HomeScreen(),
+      child: Consumer<AuthProvider>(
+        builder: (context, auth, _) {
+          final colors = AppColors.fromGender(auth.user?['gender']);
+          return MaterialApp(
+            title: 'SugarPot',
+            theme: _buildTheme(colors),
+            home: const SplashScreen(),
+            routes: {
+              '/get-started': (context) => const GetStartedScreen(),
+              '/onboarding': (context) => const OnboardingScreen(),
+              '/home': (context) => const HomeScreen(),
+            },
+            debugShowCheckedModeBanner: false,
+          );
         },
-        debugShowCheckedModeBanner: false,
       ),
     );
   }

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/match_provider.dart';
-import '../main.dart';
 import '../utils/config.dart';
 import 'chat_screen.dart';
 import 'user_profile_details_screen.dart';
+import '../theme/app_colors.dart';
 
 class MatchesScreen extends StatefulWidget {
   const MatchesScreen({super.key});
@@ -16,6 +16,8 @@ class MatchesScreen extends StatefulWidget {
 
 class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  String? _decliningMatchId;
+  String? _acceptingMatchId;
 
   @override
   void initState() {
@@ -40,9 +42,9 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
       children: [
         TabBar(
           controller: _tabController,
-          labelColor: primaryColor,
+          labelColor: context.appPrimaryColor,
           unselectedLabelColor: Colors.grey,
-          indicatorColor: primaryColor,
+          indicatorColor: context.appPrimaryColor,
           tabs: const [
             Tab(text: 'Matches'),
             Tab(text: 'Received Hearts'),
@@ -71,13 +73,18 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
         if (matchProvider.myMatches.isEmpty && !matchProvider.isLoading) {
           return RefreshIndicator(
             onRefresh: () => matchProvider.loadMyMatches(),
-            child: ListView(
-              children: const [
-                SizedBox(height: 200),
-                Center(
-                  child: Text('No matches yet. Start swiping!'),
-                ),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: const Center(
+                      child: Text('No matches yet. Start swiping!'),
+                    ),
+                  ),
+                );
+              },
             ),
           );
         }
@@ -102,6 +109,11 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
             if (lastSeenAt != null) {
               debugPrint('[MATCHES_SCREEN] User: ${user['name']}, lastSeenAt: $lastSeenAt, isActive: $isActive');
             }
+
+            final lastMessage = match['lastMessage'] as Map<String, dynamic>?;
+            final lastMessagePreview = lastMessage != null
+                ? _lastMessagePreview(lastMessage['messageType'], lastMessage['messageText'])
+                : null;
 
             return ListTile(
               leading: Stack(
@@ -149,18 +161,31 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (lastMessagePreview != null && lastMessagePreview.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        lastMessagePreview,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   if (location != null)
                     Container(
                       margin: const EdgeInsets.only(top: 4),
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.2),
+                        color: context.appPrimaryColor.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.location_on, size: 16, color: primaryColor),
+                          Icon(Icons.location_on, size: 16, color: context.appPrimaryColor),
                           const SizedBox(width: 4),
                           Flexible(
                             child: Text(
@@ -182,9 +207,12 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
                       matchId: match['matchId'],
                       otherUser: user,
                       location: location,
+                      onMessageSent: () => matchProvider.loadMyMatches(),
                     ),
                   ),
-                );
+                ).then((_) {
+                  matchProvider.loadMyMatches();
+                });
               },
             );
           },
@@ -192,6 +220,22 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
         );
       },
     );
+  }
+
+  /// Preview text for last message in chat index (text content or [Image]/[Video]/[Audio]).
+  String _lastMessagePreview(String? messageType, dynamic messageText) {
+    final type = messageType?.toString().toLowerCase() ?? 'text';
+    switch (type) {
+      case 'image':
+        return '[Image]';
+      case 'video':
+        return '[Video]';
+      case 'audio':
+        return '[Audio]';
+      default:
+        final text = messageText?.toString().trim() ?? '';
+        return text.isEmpty ? '' : text;
+    }
   }
 
   bool _isUserActive(dynamic lastSeenAt) {
@@ -264,13 +308,18 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
         if (matchProvider.receivedHearts.isEmpty && !matchProvider.isLoading) {
           return RefreshIndicator(
             onRefresh: () => matchProvider.loadReceivedHearts(reset: true),
-            child: ListView(
-              children: const [
-                SizedBox(height: 200),
-                Center(
-                  child: Text('No heart requests yet.'),
-                ),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: const Center(
+                      child: Text('No heart requests yet!'),
+                    ),
+                  ),
+                );
+              },
             ),
           );
         }
@@ -306,6 +355,7 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
 
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: context.appTertiaryColor,
               child: ListTile(
                 leading: GestureDetector(
                   onTap: () {
@@ -330,69 +380,99 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.red),
-                      onPressed: () async {
-                        try {
-                          await matchProvider.declineHeart(matchId);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Heart from ${user['name'] ?? 'Unknown'} is declined'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error: ${e.toString()}'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      },
+                    SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: _decliningMatchId == matchId
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.red),
+                            )
+                          : IconButton(
+                              icon: const Icon(Icons.close, color: Colors.red),
+                              onPressed: _acceptingMatchId == matchId
+                                  ? null
+                                  : () async {
+                                      setState(() => _decliningMatchId = matchId);
+                                      try {
+                                        await matchProvider.declineHeart(matchId);
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Heart from ${user['name'] ?? 'Unknown'} is declined'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      } catch (e) {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Error: ${e.toString()}'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      } finally {
+                                        if (mounted) {
+                                          setState(() => _decliningMatchId = null);
+                                        }
+                                      }
+                                    },
+                            ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.favorite, color: primaryColor),
-                      onPressed: () async {
-                        try {
-                          // Send heart request back to accept
-                          final response = await matchProvider.sendHeartRequest(
-                            user['id'] ?? user['_id'],
-                          );
-                          if (mounted) {
-                            if (response['match'] == true) {
-                              // Navigate to Matches tab when it becomes a match
-                              _tabController.animateTo(0);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('It\'s a match with ${user['name'] ?? 'User'}!'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Heart request sent!'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            }
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error: ${e.toString()}'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      },
+                    SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: _acceptingMatchId == matchId
+                          ? Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: context.appPrimaryColor),
+                            )
+                          : IconButton(
+                              icon: Icon(Icons.favorite, color: context.appPrimaryColor),
+                              onPressed: _decliningMatchId == matchId
+                                  ? null
+                                  : () async {
+                                      setState(() => _acceptingMatchId = matchId);
+                                      try {
+                                        final response = await matchProvider.sendHeartRequest(
+                                          user['id'] ?? user['_id'],
+                                        );
+                                        if (mounted) {
+                                          if (response['match'] == true) {
+                                            _tabController.animateTo(0);
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('It\'s a match with ${user['name'] ?? 'User'}!'),
+                                                backgroundColor: Colors.green,
+                                              ),
+                                            );
+                                          } else {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Heart request sent!'),
+                                                backgroundColor: Colors.green,
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      } catch (e) {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Error: ${e.toString()}'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      } finally {
+                                        if (mounted) {
+                                          setState(() => _acceptingMatchId = null);
+                                        }
+                                      }
+                                    },
+                            ),
                     ),
                   ],
                 ),

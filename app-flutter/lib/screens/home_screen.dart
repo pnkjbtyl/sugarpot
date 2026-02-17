@@ -8,7 +8,6 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../providers/auth_provider.dart';
 import '../services/firebase_service.dart';
 import '../services/api_service.dart';
-import '../main.dart';
 import '../utils/config.dart';
 import 'swipe_screen.dart' show SwipeScreen, swipeScreenKey;
 import 'matches_screen.dart';
@@ -17,6 +16,7 @@ import 'edit_profile_screen.dart';
 import 'photos_media_screen.dart';
 import 'dating_preferences_screen.dart';
 import 'account_settings_screen.dart';
+import '../theme/app_colors.dart';
 
 class HomeScreen extends StatefulWidget {
   final int? initialIndex;
@@ -112,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           right: -8,
                           child: Container(
                             decoration: BoxDecoration(
-                              color: primaryColor,
+                              color: context.appPrimaryColor,
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: Colors.white,
@@ -185,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   children: [
                     ListTile(
-                      leading: const Icon(Icons.edit, color: primaryColor),
+                      leading: Icon(Icons.edit, color: context.appPrimaryColor),
                       title: const Text('Edit Profile'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () {
@@ -198,7 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const Divider(height: 1),
                     ListTile(
-                      leading: const Icon(Icons.favorite, color: primaryColor),
+                      leading: Icon(Icons.favorite, color: context.appPrimaryColor),
                       title: const Text('Dating Preferences'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () {
@@ -211,7 +211,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const Divider(height: 1),
                     ListTile(
-                      leading: const Icon(Icons.photo_library, color: primaryColor),
+                      leading: Icon(Icons.photo_library, color: context.appPrimaryColor),
                       title: const Text('Photos & Media'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () {
@@ -224,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const Divider(height: 1),
                     ListTile(
-                      leading: const Icon(Icons.settings, color: primaryColor),
+                      leading: Icon(Icons.settings, color: context.appPrimaryColor),
                       title: const Text('Account Settings'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () {
@@ -237,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const Divider(height: 1),
                     ListTile(
-                      leading: const Icon(Icons.logout, color: primaryColor),
+                      leading: Icon(Icons.logout, color: context.appPrimaryColor),
                       title: const Text('Logout'),
                       onTap: () async {
                         await authProvider.logout();
@@ -427,7 +427,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // Prevent back from Profile/Explore/Matches from returning to login when user has valid token
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
       appBar: AppBar(
         title: const Row(
           mainAxisSize: MainAxisSize.min,
@@ -437,8 +440,9 @@ class _HomeScreenState extends State<HomeScreen> {
             Text('SugarPot'),
           ],
         ),
-        backgroundColor: primaryColor,
+        backgroundColor: context.appPrimaryColor,
         foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         automaticallyImplyLeading: false,
       ),
       body: IndexedStack(
@@ -464,8 +468,8 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         },
         type: BottomNavigationBarType.fixed,
-        backgroundColor: const Color(0xFFF7D9ED),
-        selectedItemColor: primaryColor,
+        backgroundColor: context.appSecondaryColor,
+        selectedItemColor: context.appPrimaryColor,
         unselectedItemColor: Colors.grey[600],
         items: const [
           BottomNavigationBarItem(
@@ -482,6 +486,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 }

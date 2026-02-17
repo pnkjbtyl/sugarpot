@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const Match = require('../models/Match');
+const Message = require('../models/Message');
 const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -86,7 +87,7 @@ router.post('/pass', authenticateToken, async (req, res) => {
   }
 });
 
-// Get all matches for current user
+// Get all matches for current user (with last message preview)
 router.get('/my-matches', authenticateToken, async (req, res) => {
   try {
     const matches = await Match.find({
@@ -100,6 +101,21 @@ router.get('/my-matches', authenticateToken, async (req, res) => {
     .populate('user2', 'name age bio photos profileImage gender location gallery lastSeenAt')
     .populate('location')
     .sort({ createdAt: -1 });
+
+    const matchIds = matches.map(m => m._id);
+    const lastMessages = await Message.aggregate([
+      { $match: { matchId: { $in: matchIds } } },
+      { $sort: { sentAt: -1 } },
+      { $group: {
+        _id: '$matchId',
+        messageText: { $first: '$messageText' },
+        messageType: { $first: '$messageType' },
+        sentAt: { $first: '$sentAt' }
+      }}
+    ]);
+    const lastMessageByMatchId = Object.fromEntries(
+      lastMessages.map(m => [m._id.toString(), { messageText: m.messageText, messageType: m.messageType, sentAt: m.sentAt ? new Date(m.sentAt).toISOString() : null }])
+    );
 
     // Format matches to show the other user
     const formattedMatches = matches.map(match => {
@@ -122,13 +138,16 @@ router.get('/my-matches', authenticateToken, async (req, res) => {
         gallery: otherUser.gallery,
         lastSeenAt: otherUser.lastSeenAt ? otherUser.lastSeenAt.toISOString() : null
       } : null;
+
+      const lastMessage = lastMessageByMatchId[match._id.toString()];
       
       return {
         matchId: match._id.toString(),
         user: serializedUser,
         location: match.location,
         selectedBy: match.selectedBy,
-        createdAt: match.createdAt
+        createdAt: match.createdAt,
+        lastMessage: lastMessage || null
       };
     }).filter(m => m.user !== null); // Filter out any null users
 

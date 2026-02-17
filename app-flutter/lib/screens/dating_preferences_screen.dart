@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../main.dart';
+import '../theme/app_colors.dart';
 
 class DatingPreferencesScreen extends StatefulWidget {
   const DatingPreferencesScreen({super.key});
@@ -224,7 +225,7 @@ class _DatingPreferencesScreenState extends State<DatingPreferencesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dating Preferences'),
-        backgroundColor: primaryColor,
+        backgroundColor: context.appPrimaryColor,
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
@@ -428,7 +429,7 @@ class _DatingPreferencesScreenState extends State<DatingPreferencesScreen> {
                   onPressed: _isLoading ? null : _savePreferences,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: primaryColor,
+                    backgroundColor: context.appPrimaryColor,
                     foregroundColor: Colors.white,
                   ),
                   child: _isLoading
@@ -469,27 +470,27 @@ class _DatingPreferencesScreenState extends State<DatingPreferencesScreen> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           border: Border.all(
-            color: isSelected ? primaryColor : Colors.grey[300]!,
+            color: isSelected ? context.appPrimaryColor : Colors.grey[300]!,
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(8),
-          color: isSelected ? primaryColor.withOpacity(0.1) : Colors.white,
+          color: isSelected ? context.appPrimaryColor.withOpacity(0.1) : Colors.white,
         ),
         child: Row(
           children: [
-            Icon(icon, color: isSelected ? primaryColor : Colors.grey),
+            Icon(icon, color: isSelected ? context.appPrimaryColor : Colors.grey),
             const SizedBox(width: 16),
             Text(
               label,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? primaryColor : Colors.black,
+                color: isSelected ? context.appPrimaryColor : Colors.black,
               ),
             ),
             const Spacer(),
             if (isSelected)
-              Icon(Icons.check_circle, color: primaryColor),
+              Icon(Icons.check_circle, color: context.appPrimaryColor),
           ],
         ),
       ),

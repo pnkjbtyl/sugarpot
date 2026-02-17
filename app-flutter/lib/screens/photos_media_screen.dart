@@ -10,6 +10,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../services/api_service.dart';
 import '../providers/auth_provider.dart';
 import '../main.dart';
+import '../theme/app_colors.dart';
 import '../utils/config.dart';
 
 class PhotosMediaScreen extends StatefulWidget {
@@ -640,7 +641,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
     return Scaffold(
       appBar: AppBar(
         title: const Text('Photos & Media'),
-        backgroundColor: primaryColor,
+        backgroundColor: context.appPrimaryColor,
         foregroundColor: Colors.white,
         bottom: TabBar(
           controller: _tabController,
@@ -668,7 +669,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
       floatingActionButton: _isUploading
           ? FloatingActionButton(
               onPressed: null,
-              backgroundColor: primaryColor.withOpacity(0.7),
+              backgroundColor: context.appPrimaryColor.withOpacity(0.7),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
@@ -704,7 +705,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
             )
           : FloatingActionButton(
               onPressed: _pickAndUploadMedia,
-              backgroundColor: primaryColor,
+              backgroundColor: context.appPrimaryColor,
               child: const Icon(Icons.add, color: Colors.white),
             ),
     );
@@ -854,7 +855,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
   void _showImageViewer(String imageUrl) {
     showDialog(
       context: context,
-      barrierColor: primaryColor,
+      barrierColor: context.appPrimaryColor,
       barrierDismissible: true,
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
@@ -898,7 +899,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
   void _showVideoPlayer(String videoUrl) {
     showDialog(
       context: context,
-      barrierColor: primaryColor,
+      barrierColor: context.appPrimaryColor,
       barrierDismissible: true,
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,

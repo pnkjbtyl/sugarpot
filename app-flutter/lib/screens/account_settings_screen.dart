@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../main.dart';
+import '../theme/app_colors.dart';
 import 'change_email_screen.dart';
 import 'get_started_screen.dart';
 
@@ -14,7 +15,7 @@ class AccountSettingsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Account Settings'),
-        backgroundColor: primaryColor,
+        backgroundColor: context.appPrimaryColor,
         foregroundColor: Colors.white,
       ),
       body: ListView(
@@ -27,7 +28,7 @@ class AccountSettingsScreen extends StatelessWidget {
               return ListTile(
                 leading: Icon(
                   isHidden ? Icons.visibility_off : Icons.visibility,
-                  color: primaryColor,
+                  color: context.appPrimaryColor,
                 ),
                 title: const Text('Hide Profile'),
                 subtitle: Text(
@@ -40,14 +41,14 @@ class AccountSettingsScreen extends StatelessWidget {
                   onChanged: (value) {
                     _showHideProfileDialog(context, authProvider, value);
                   },
-                  activeColor: primaryColor,
+                  activeColor: context.appPrimaryColor,
                 ),
               );
             },
           ),
           const Divider(height: 1),
           ListTile(
-            leading: const Icon(Icons.email, color: primaryColor),
+            leading: Icon(Icons.email, color: context.appPrimaryColor),
             title: const Text('Change Email'),
             subtitle: const Text('Update your email address'),
             trailing: const Icon(Icons.chevron_right),
@@ -74,7 +75,7 @@ class AccountSettingsScreen extends StatelessWidget {
           ),
           const Divider(height: 1),
           ListTile(
-            leading: const Icon(Icons.help, color: primaryColor),
+            leading: Icon(Icons.help, color: context.appPrimaryColor),
             title: const Text('Help'),
             subtitle: const Text('Contact support'),
             trailing: const Icon(Icons.chevron_right),
@@ -132,7 +133,7 @@ class AccountSettingsScreen extends StatelessWidget {
                 await _toggleProfileVisibility(context, authProvider);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
+                backgroundColor: context.appPrimaryColor,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Confirm'),

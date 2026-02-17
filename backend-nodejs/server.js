@@ -66,6 +66,15 @@ app.use((req, res, next) => {
   res.setTimeout(30 * 60 * 1000); // 30 minutes
   next();
 });
+
+if(process.env.NODE_ENV === 'development') {
+  // 5 second delay on every response (e.g. for testing loading states)
+  const RESPONSE_DELAY_MS = 5000;
+  app.use((req, res, next) => {
+    setTimeout(next, RESPONSE_DELAY_MS);
+  });
+}
+
 // Serve uploaded files (images and videos) with proper headers for video streaming
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res, filePath) => {

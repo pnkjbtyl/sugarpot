@@ -12,23 +12,26 @@ import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../providers/match_provider.dart';
-import '../main.dart';
 import '../services/socket_service.dart';
 import '../services/api_service.dart';
 import '../utils/config.dart';
 import 'user_profile_details_screen.dart';
 import 'home_screen.dart';
+import '../theme/app_colors.dart';
 
 class ChatScreen extends StatefulWidget {
   final String matchId;
   final Map<String, dynamic> otherUser;
   final Map<String, dynamic>? location;
+  /// Called when a message is sent (so chat index can refresh last message).
+  final VoidCallback? onMessageSent;
 
   const ChatScreen({
     super.key,
     required this.matchId,
     required this.otherUser,
     this.location,
+    this.onMessageSent,
   });
 
   @override
@@ -98,6 +101,7 @@ class _ChatScreenState extends State<ChatScreen> {
           }
         });
         _scrollToBottom();
+        widget.onMessageSent?.call();
       });
 
       // Listen for delivery confirmation
@@ -801,13 +805,15 @@ class _ChatScreenState extends State<ChatScreen> {
     if (timestamp == null) return '';
     try {
       final dateTime = DateTime.parse(timestamp);
+      // Convert to user's local timezone for display
+      final local = dateTime.isUtc ? dateTime.toLocal() : dateTime;
       final now = DateTime.now();
-      final difference = now.difference(dateTime);
+      final difference = now.difference(local);
 
       if (difference.inDays == 0) {
-        // Today - show time
-        final hour = dateTime.hour;
-        final minute = dateTime.minute.toString().padLeft(2, '0');
+        // Today - show time in local
+        final hour = local.hour;
+        final minute = local.minute.toString().padLeft(2, '0');
         final period = hour >= 12 ? 'PM' : 'AM';
         final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
         return '$displayHour:$minute $period';
@@ -816,20 +822,21 @@ class _ChatScreenState extends State<ChatScreen> {
       } else if (difference.inDays < 7) {
         return '${difference.inDays} days ago';
       } else {
-        return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+        return '${local.day}/${local.month}/${local.year}';
       }
     } catch (e) {
       return '';
     }
   }
 
-  Widget _buildMessageContent(Map<String, dynamic> message, bool isMe) {
+  Widget _buildMessageContent(Map<String, dynamic> message, bool isMe, {Color? receivedTertiary}) {
     final messageType = message['messageType'] ?? 'text';
     final messageText = message['messageText'] ?? '';
     
     if (messageType == 'text') {
       return Text(
         messageText,
+        textAlign: isMe ? TextAlign.right : TextAlign.left,
         style: TextStyle(
           color: isMe ? Colors.black87 : Colors.black87,
         ),
@@ -840,7 +847,7 @@ class _ChatScreenState extends State<ChatScreen> {
         onTap: () {
           showDialog(
             context: context,
-            barrierColor: primaryColor,
+            barrierColor: context.appPrimaryColor,
             barrierDismissible: true,
             builder: (context) => Dialog(
               backgroundColor: Colors.transparent,
@@ -913,7 +920,7 @@ class _ChatScreenState extends State<ChatScreen> {
       return _VideoMessageWidget(videoUrl: videoUrl);
     } else if (messageType == 'audio') {
       final audioUrl = messageText.startsWith('http') ? messageText : AppConfig.buildImageUrl(messageText);
-      return _AudioMessageWidget(audioUrl: audioUrl, isMe: isMe);
+      return _AudioMessageWidget(audioUrl: audioUrl, isMe: isMe, receivedBubbleColor: receivedTertiary);
     }
     
     return Text(
@@ -930,7 +937,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     if (message['isDelivered'] == true) {
-      return const Icon(Icons.done_all, size: 16, color: primaryColor);
+      return Icon(Icons.done_all, size: 16, color: context.appPrimaryColor);
     } else if (message['isSent'] == true) {
       return const Icon(Icons.done, size: 16, color: Colors.grey);
     }
@@ -1004,7 +1011,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ),
         ),
-        backgroundColor: primaryColor,
+        backgroundColor: context.appPrimaryColor,
         foregroundColor: Colors.white,
         actions: [
           PopupMenuButton<String>(
@@ -1059,10 +1066,10 @@ class _ChatScreenState extends State<ChatScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              color: primaryColor.withOpacity(0.1),
+              color: context.appPrimaryColor.withOpacity(0.1),
               child: Row(
                 children: [
-                  Icon(Icons.location_on, color: primaryColor),
+                  Icon(Icons.location_on, color: context.appPrimaryColor),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
@@ -1110,6 +1117,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           final message = _messages[_messages.length - 1 - index];
                           final isMe = message['senderId'] == _currentUserId;
                           final sentAt = message['sentAt'] as String?;
+                          // Received messages use sender's (other user's) gender tertiary color
+                          final receivedTertiary = AppColors.fromGender(widget.otherUser['gender']).tertiary;
 
                           return Align(
                             alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -1127,13 +1136,14 @@ class _ChatScreenState extends State<ChatScreen> {
                                   vertical: 10,
                                 ),
                               decoration: BoxDecoration(
-                                color: isMe ? const Color(0xFFF7D9ED) : Colors.grey[300],
+                                color: isMe ? context.appTertiaryColor : receivedTertiary,
                                 borderRadius: BorderRadius.circular(20),
                               ),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    _buildMessageContent(message, isMe),
+                                    _buildMessageContent(message, isMe, receivedTertiary: receivedTertiary),
                                     const SizedBox(height: 4),
                                     Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -1162,11 +1172,16 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           SafeArea(
             top: false,
-            minimum: const EdgeInsets.only(bottom: 0),
+            bottom: false,
             child: Container(
-              padding: const EdgeInsets.all(8),
+              padding: EdgeInsets.only(
+                left: 8,
+                right: 8,
+                top: 8,
+                bottom: 8 + MediaQuery.of(context).padding.bottom,
+              ),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.appSecondaryColor,
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.1),
@@ -1184,7 +1199,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Icon(Icons.attach_file, color: primaryColor),
+                        : Icon(Icons.attach_file, color: context.appPrimaryColor),
                     onPressed: _isUploading ? null : _pickAndUploadFile,
                   ),
                   Expanded(
@@ -1203,7 +1218,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: Icon(Icons.send, color: primaryColor),
+                    icon: Icon(Icons.send, color: context.appPrimaryColor),
                     onPressed: _sendMessage,
                   ),
                 ],
@@ -1295,7 +1310,7 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
       onTap: () {
         showDialog(
           context: context,
-          barrierColor: primaryColor,
+          barrierColor: context.appPrimaryColor,
           barrierDismissible: true,
           builder: (context) => Dialog(
             backgroundColor: Colors.transparent,
@@ -1373,10 +1388,12 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
 class _AudioMessageWidget extends StatefulWidget {
   final String audioUrl;
   final bool isMe;
+  final Color? receivedBubbleColor;
 
   const _AudioMessageWidget({
     required this.audioUrl,
     required this.isMe,
+    this.receivedBubbleColor,
   });
 
   @override
@@ -1532,7 +1549,7 @@ class _AudioMessageWidgetState extends State<_AudioMessageWidget> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: widget.isMe ? const Color.fromARGB(255, 252, 234, 246) : Colors.grey[400],
+          color: widget.isMe ? context.appTertiaryColor : (widget.receivedBubbleColor ?? Colors.grey[400]),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
@@ -1550,13 +1567,13 @@ class _AudioMessageWidgetState extends State<_AudioMessageWidget> {
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              widget.isMe ? primaryColor : Colors.black87,
+                              widget.isMe ? context.appPrimaryColor : Colors.black87,
                             ),
                           ),
                         )
                       : Icon(
                           _isPlaying ? Icons.pause : Icons.play_arrow,
-                          color: widget.isMe ? primaryColor : Colors.black87,
+                          color: widget.isMe ? context.appPrimaryColor : Colors.black87,
                         ),
                   onPressed: _isInitialized ? _togglePlayPause : null,
                 ),
@@ -1592,13 +1609,13 @@ class _AudioMessageWidgetState extends State<_AudioMessageWidget> {
                 padding: const EdgeInsets.only(top: 8),
                 child: SliderTheme(
                   data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: widget.isMe ? primaryColor : Colors.black87,
+                    activeTrackColor: widget.isMe ? context.appPrimaryColor : Colors.black87,
                     inactiveTrackColor: widget.isMe
-                        ? primaryColor.withOpacity(0.3)
+                        ? context.appPrimaryColor.withOpacity(0.3)
                         : Colors.black26,
-                    thumbColor: widget.isMe ? primaryColor : Colors.black87,
+                    thumbColor: widget.isMe ? context.appPrimaryColor : Colors.black87,
                     overlayColor: widget.isMe
-                        ? primaryColor.withOpacity(0.2)
+                        ? context.appPrimaryColor.withOpacity(0.2)
                         : Colors.black12,
                     trackHeight: 2,
                     thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),

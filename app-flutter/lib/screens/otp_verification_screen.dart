@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import 'onboarding_screen.dart';
 import 'home_screen.dart';
 import '../main.dart';
+import '../theme/app_colors.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String email;
@@ -120,16 +121,18 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         final missingPage = authProvider.getMissingOnboardingPage();
         
         if (missingPage == -1) {
-          // All fields are complete, go to People screen (index 1)
-          Navigator.of(context).pushReplacement(
+          // All fields are complete, go to People screen (index 1). Clear stack so back won't return to login.
+          Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const HomeScreen(initialIndex: 1)),
+            (route) => false,
           );
         } else {
-          // Navigate to the first missing field page
-          Navigator.of(context).pushReplacement(
+          // Navigate to the first missing field page. Clear stack so back won't return to login.
+          Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
               builder: (_) => OnboardingScreen(initialPage: missingPage),
             ),
+            (route) => false,
           );
         }
       } else {
@@ -153,7 +156,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Verify Email'),
-        backgroundColor: primaryColor,
+        backgroundColor: context.appPrimaryColor,
         foregroundColor: Colors.white,
       ),
       body: SafeArea(
@@ -166,7 +169,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
               Icon(
                 Icons.email_outlined,
                 size: 80,
-                color: primaryColor,
+                color: context.appPrimaryColor,
               ),
               const SizedBox(height: 20),
               Text(
@@ -211,8 +214,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: primaryColor,
+                          borderSide: BorderSide(
+                            color: context.appPrimaryColor,
                             width: 2,
                           ),
                         ),
@@ -246,7 +249,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                             },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: primaryColor,
+                        backgroundColor: context.appPrimaryColor,
                         foregroundColor: Colors.white,
                       ),
                       child: isLoading

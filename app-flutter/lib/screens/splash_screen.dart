@@ -6,6 +6,7 @@ import '../main.dart';
 import 'get_started_screen.dart';
 import 'onboarding_screen.dart';
 import 'home_screen.dart';
+import '../theme/app_colors.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -43,16 +44,18 @@ class _SplashScreenState extends State<SplashScreen> {
       final missingPage = authProvider.getMissingOnboardingPage();
       
       if (missingPage == -1) {
-        // All fields are complete, go to People screen (index 1)
-        Navigator.of(context).pushReplacement(
+        // All fields are complete, go to People screen (index 1). Clear stack so back won't return to login.
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomeScreen(initialIndex: 1)),
+          (route) => false,
         );
       } else {
-        // Navigate to the first missing field page
-        Navigator.of(context).pushReplacement(
+        // Navigate to the first missing field page. Clear stack so back won't return to login.
+        Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
             builder: (_) => OnboardingScreen(initialPage: missingPage),
           ),
+          (route) => false,
         );
       }
     } else {
@@ -72,15 +75,15 @@ class _SplashScreenState extends State<SplashScreen> {
             Icon(
               Icons.favorite,
               size: 100,
-              color: primaryColor,
+              color: context.appPrimaryColor,
             ),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'SugarPot',
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
-                color: primaryColor,
+                color: context.appPrimaryColor,
               ),
             ),
           ],

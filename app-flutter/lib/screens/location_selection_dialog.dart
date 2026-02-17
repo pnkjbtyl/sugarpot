@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../theme/app_colors.dart';
 
 class LocationSelectionDialog extends StatelessWidget {
   final List<dynamic> locations;
@@ -43,7 +44,7 @@ class LocationSelectionDialog extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final location = locations[index];
                     return ListTile(
-                      leading: Icon(Icons.location_on, color: primaryColor),
+                      leading: Icon(Icons.location_on, color: context.appPrimaryColor),
                       title: Text(location['name'] ?? 'Unknown'),
                       subtitle: location['description'] != null
                           ? Text(location['description'])

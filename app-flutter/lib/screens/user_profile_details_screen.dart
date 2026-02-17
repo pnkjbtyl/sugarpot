@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:video_player/video_player.dart';
 import '../main.dart';
+import '../theme/app_colors.dart';
 import '../utils/config.dart';
 
 class UserProfileDetailsScreen extends StatelessWidget {
@@ -32,7 +33,7 @@ class UserProfileDetailsScreen extends StatelessWidget {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(user['name'] ?? 'Profile'),
-        backgroundColor: primaryColor,
+        backgroundColor: context.appPrimaryColor,
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
@@ -96,7 +97,7 @@ class UserProfileDetailsScreen extends StatelessWidget {
                               : user['gender'] == 'female'
                                   ? Icons.female
                                   : Icons.transgender,
-                          color: primaryColor,
+                          color: context.appPrimaryColor,
                           size: 28,
                         ),
                       ],
@@ -153,17 +154,17 @@ class UserProfileDetailsScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.1),
+                        color: context.appPrimaryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: primaryColor.withOpacity(0.3),
+                          color: context.appPrimaryColor.withOpacity(0.3),
                         ),
                       ),
                       child: Row(
                         children: [
                           Icon(
                             Icons.favorite,
-                            color: primaryColor,
+                            color: context.appPrimaryColor,
                             size: 20,
                           ),
                           const SizedBox(width: 8),
@@ -188,21 +189,24 @@ class UserProfileDetailsScreen extends StatelessWidget {
                     'Details',
                     [
                       if (user['profession'] != null)
-                        _buildDetailItem(Icons.work, 'Profession', user['profession']),
+                        _buildDetailItem(context, Icons.work, 'Profession', user['profession']),
                       if (user['eatingHabits'] != null)
                         _buildDetailItem(
+                          context,
                           Icons.restaurant,
                           'Eating Habits',
                           _capitalizeFirst(user['eatingHabits']),
                         ),
                       if (user['smoking'] != null)
                         _buildDetailItem(
+                          context,
                           Icons.smoking_rooms,
                           'Smoking',
                           _capitalizeFirst(user['smoking']),
                         ),
                       if (user['drinking'] != null)
                         _buildDetailItem(
+                          context,
                           Icons.local_bar,
                           'Drinking',
                           _capitalizeFirst(user['drinking']),
@@ -266,12 +270,12 @@ class UserProfileDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailItem(IconData icon, String label, String value) {
+  Widget _buildDetailItem(BuildContext context, IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: primaryColor),
+          Icon(icon, size: 20, color: context.appPrimaryColor),
           const SizedBox(width: 12),
           Text(
             '$label: ',
@@ -384,7 +388,7 @@ class UserProfileDetailsScreen extends StatelessWidget {
   void _showImageViewer(BuildContext context, String imageUrl) {
     showDialog(
       context: context,
-      barrierColor: primaryColor,
+      barrierColor: context.appPrimaryColor,
       builder: (context) => GestureDetector(
         onTap: () => Navigator.of(context).pop(),
         child: Stack(
@@ -426,7 +430,7 @@ class UserProfileDetailsScreen extends StatelessWidget {
   void _showVideoPlayer(BuildContext context, String videoUrl) {
     showDialog(
       context: context,
-      barrierColor: primaryColor,
+      barrierColor: context.appPrimaryColor,
       builder: (context) => _VideoPlayerDialog(videoUrl: videoUrl),
     );
   }

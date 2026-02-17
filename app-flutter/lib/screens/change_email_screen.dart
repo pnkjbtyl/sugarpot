@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../main.dart';
+import '../theme/app_colors.dart';
 import 'otp_verification_screen.dart';
 
 class ChangeEmailScreen extends StatefulWidget {
@@ -258,7 +259,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Change Email'),
-        backgroundColor: primaryColor,
+        backgroundColor: context.appPrimaryColor,
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
@@ -308,7 +309,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _sendCurrentEmailOtp,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
+                      backgroundColor: context.appPrimaryColor,
                       foregroundColor: Colors.white,
                     ),
                     child: const Text('Verify Current Email'),
@@ -355,7 +356,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _sendNewEmailOtp,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
+                      backgroundColor: context.appPrimaryColor,
                       foregroundColor: Colors.white,
                     ),
                     child: const Text('Verify New Email'),
@@ -369,7 +370,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
                     onPressed: _isLoading ? null : _changeEmail,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: primaryColor,
+                      backgroundColor: context.appPrimaryColor,
                       foregroundColor: Colors.white,
                     ),
                     child: _isLoading
