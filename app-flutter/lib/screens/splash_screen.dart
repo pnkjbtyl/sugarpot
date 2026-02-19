@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../main.dart';
 import 'get_started_screen.dart';
 import 'onboarding_screen.dart';
 import 'home_screen.dart';
-import '../theme/app_colors.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -69,24 +67,10 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.favorite,
-              size: 100,
-              color: context.appPrimaryColor,
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'SugarPot',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: context.appPrimaryColor,
-              ),
-            ),
-          ],
+        child: Image.asset(
+          'assets/images/SugarPot-logo-dark.png',
+          height: 80,
+          fit: BoxFit.contain,
         ),
       ),
     );

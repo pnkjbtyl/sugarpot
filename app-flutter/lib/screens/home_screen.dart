@@ -432,13 +432,10 @@ class _HomeScreenState extends State<HomeScreen> {
       canPop: false,
       child: Scaffold(
       appBar: AppBar(
-        title: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.favorite, size: 24),
-            SizedBox(width: 8),
-            Text('SugarPot'),
-          ],
+        title: Image.asset(
+          'assets/images/SugarPot-logo-light.png',
+          height: 40,
+          fit: BoxFit.contain,
         ),
         backgroundColor: context.appPrimaryColor,
         foregroundColor: Colors.white,

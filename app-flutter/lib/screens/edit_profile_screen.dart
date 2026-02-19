@@ -259,7 +259,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextFormField(
                 controller: _bioController,
                 decoration: const InputDecoration(
-                  labelText: 'About you *',
+                  labelText: 'About you',
                   hintText: 'Tell us about yourself...',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.description),
@@ -268,11 +268,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 maxLines: 2,
                 maxLength: 120,
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Bio is required';
-                  }
-                  if (value.length > 120) {
-                    return 'Bio must be 120 characters or less';
+                  if (value != null && value.trim().isNotEmpty && value.length > 120) {
+                    return 'About you must be 120 characters or less';
                   }
                   return null;
                 },

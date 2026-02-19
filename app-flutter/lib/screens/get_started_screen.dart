@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'otp_verification_screen.dart';
-import '../main.dart';
 import '../theme/app_colors.dart';
 
 class GetStartedScreen extends StatefulWidget {
@@ -60,29 +59,19 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.favorite,
-                    size: 80,
-                    color: context.appPrimaryColor,
+                  Image.asset(
+                    'assets/images/SugarPot-logo-dark.png',
+                    height: 80,
+                    fit: BoxFit.contain,
                   ),
-                  const SizedBox(height: 20),
                   Text(
-                    'SugarPot',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: context.appPrimaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Find your perfect match',
+                    '...finds your perfect match!',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey[600],
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 36),
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,

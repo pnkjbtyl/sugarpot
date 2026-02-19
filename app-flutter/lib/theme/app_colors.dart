@@ -16,8 +16,15 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color secondary;
   final Color tertiary;
 
-  /// Default scheme (not logged in or no gender) - purple from main.dart
+  /// Default scheme (not logged in or no gender) - red from main.dart
   static const AppColors defaultScheme = AppColors(
+    primary: Color.fromRGBO(36, 36, 36, 1),
+    secondary: Color.fromARGB(255, 255, 185, 200),
+    tertiary: Color.fromARGB(255, 252, 228, 233),
+  );
+
+  /// Transgender / Other Gender scheme - lavendar shades
+  static const AppColors transgenderScheme = AppColors(
     primary: Color(0xFFab76e3),
     secondary: Color.fromARGB(255, 238, 222, 255),
     tertiary: Color.fromARGB(255, 245, 236, 255),
@@ -37,12 +44,13 @@ class AppColors extends ThemeExtension<AppColors> {
     tertiary: Color.fromARGB(255, 255, 232, 245),
   );
 
-  /// Build scheme from user's gender. [gender] can be null, 'male', 'female', etc.
+  /// Build scheme from user's gender. [gender] can be null, 'male', 'female', 'other', etc.
   static AppColors fromGender(dynamic gender) {
     if (gender == null) return defaultScheme;
     final g = gender.toString().toLowerCase();
     if (g == 'male' || g == 'm') return maleScheme;
     if (g == 'female' || g == 'f') return femaleScheme;
+    if (g == 'other' || g == 'o' || g == 'transgender' || g == 'non-binary') return transgenderScheme;
     return defaultScheme;
   }
 
