@@ -5,9 +5,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import '../providers/auth_provider.dart';
 import '../utils/auth_errors.dart';
+import '../utils/config.dart';
 import 'home_screen.dart';
 import '../theme/app_colors.dart';
 import 'get_started_screen.dart';
@@ -31,6 +33,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   DateTime? _dateOfBirth;
   String? _gender;
   File? _profileImage;
+  /// Existing profile image URL from backend (for users returning to onboarding).
+  String? _existingProfileImageUrl;
   final ImagePicker _picker = ImagePicker();
   late int _currentPage;
   bool _isCompleting = false;
@@ -58,6 +62,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           }
           if (user['gender'] != null) {
             _gender = user['gender'];
+          }
+          final profileImage = user['profileImage'];
+          if (profileImage != null && profileImage.toString().trim().isNotEmpty) {
+            _existingProfileImageUrl = profileImage.toString().trim();
           }
           if (user['pickupLine'] != null) {
             _pickupLineController.text = user['pickupLine'];
@@ -151,7 +159,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       case 1: // Gender
         return _gender != null;
       case 2: // Profile Image
-        return _profileImage != null;
+        return _profileImage != null || (_existingProfileImageUrl != null && _existingProfileImageUrl!.isNotEmpty);
       case 3: // Pickup Line
         final pickupLine = _pickupLineController.text.trim();
         return pickupLine.isNotEmpty && 
@@ -169,7 +177,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _dateOfBirth != null &&
         _isAtLeast18YearsOld() &&
         _gender != null &&
-        _profileImage != null &&
+        (_profileImage != null || (_existingProfileImageUrl != null && _existingProfileImageUrl!.isNotEmpty)) &&
         pickupLine.isNotEmpty &&
         pickupLine.length >= 10 &&
         pickupLine.length <= 50;
@@ -283,7 +291,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       name: _nameController.text.trim(),
       dateOfBirth: _dateOfBirth!,
       gender: _gender!,
-      profileImage: _profileImage!,
+      profileImage: _profileImage,
+      existingProfileImageUrl: _existingProfileImageUrl,
       pickupLine: _pickupLineController.text.trim(),
       latitude: position.latitude,
       longitude: position.longitude,
@@ -633,20 +642,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               fit: BoxFit.cover,
                             ),
                           )
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.camera_alt, size: 60, color: Colors.grey[600]),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Tap to add photo',
-                                style: TextStyle(color: Colors.grey[600]),
+                        : (_existingProfileImageUrl != null && _existingProfileImageUrl!.isNotEmpty)
+                            ? ClipOval(
+                                child: CachedNetworkImage(
+                                  imageUrl: AppConfig.buildImageUrl(_existingProfileImageUrl),
+                                  fit: BoxFit.cover,
+                                  width: 200,
+                                  height: 200,
+                                  placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
+                                  errorWidget: (_, __, ___) => Icon(Icons.person, size: 60, color: Colors.grey[600]),
+                                ),
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.camera_alt, size: 60, color: Colors.grey[600]),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Tap to add photo',
+                                    style: TextStyle(color: Colors.grey[600]),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
                   ),
                 ),
-                if (_profileImage == null && _currentPage == 2)
+                if (_profileImage == null && _existingProfileImageUrl == null && _currentPage == 2)
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0),
                     child: Text(

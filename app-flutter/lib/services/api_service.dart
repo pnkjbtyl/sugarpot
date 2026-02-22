@@ -140,6 +140,19 @@ class ApiService {
     return data;
   }
 
+  // Get another user's profile by id (only for matched users; e.g. chat header)
+  Future<Map<String, dynamic>> getUserProfile(String userId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/users/profile/$userId'),
+      headers: await _getHeaders(),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode != 200) {
+      throw Exception(data['message'] ?? 'Failed to load profile');
+    }
+    return Map<String, dynamic>.from(data);
+  }
+
   // Upload profile image
   Future<Map<String, dynamic>> uploadProfileImage(File imageFile) async {
     final token = await _getToken();

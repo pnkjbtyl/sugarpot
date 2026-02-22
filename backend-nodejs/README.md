@@ -16,14 +16,19 @@ cp .env.example .env
 
 3. Update `.env` with your MongoDB connection string and JWT secret.
 
-4. Start MongoDB (make sure MongoDB is running on your system).
+4. (Optional) **Chat notifications (FCM):** To send push notifications for new chat messages, set one of:
+   - `GOOGLE_APPLICATION_CREDENTIALS` = absolute path to your Firebase service account JSON file, or
+   - `FIREBASE_SERVICE_ACCOUNT_PATH` = path (relative to project root) to the JSON file.
+   Get the key from Firebase Console → Project Settings → Service accounts → Generate new private key.
 
-5. Seed initial locations data:
+5. Start MongoDB (make sure MongoDB is running on your system).
+
+6. Seed initial locations data:
 ```bash
 npm run seed
 ```
 
-6. Start the server:
+7. Start the server:
 ```bash
 npm start
 ```

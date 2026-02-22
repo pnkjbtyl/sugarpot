@@ -5,3 +5,6 @@ uploads/*
 *.log
 .env
 .DS_Store
+# Firebase service account key (do not commit)
+config/*firebase*.json
+config/*-firebase-adminsdk-*.json

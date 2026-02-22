@@ -8,7 +8,10 @@ import 'user_profile_details_screen.dart';
 import '../theme/app_colors.dart';
 
 class MatchesScreen extends StatefulWidget {
-  const MatchesScreen({super.key});
+  /// When non-null, opens this tab on load (0 = Matches, 1 = Received Hearts).
+  final int? initialTabIndex;
+
+  const MatchesScreen({super.key, this.initialTabIndex});
 
   @override
   State<MatchesScreen> createState() => _MatchesScreenState();
@@ -22,7 +25,10 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    final initialIndex = widget.initialTabIndex != null && widget.initialTabIndex! >= 0 && widget.initialTabIndex! < 2
+        ? widget.initialTabIndex!
+        : 0;
+    _tabController = TabController(length: 2, vsync: this, initialIndex: initialIndex);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final matchProvider = Provider.of<MatchProvider>(context, listen: false);
       matchProvider.loadMyMatches();
@@ -315,7 +321,7 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
                   child: ConstrainedBox(
                     constraints: BoxConstraints(minHeight: constraints.maxHeight),
                     child: const Center(
-                      child: Text('No heart requests yet!'),
+                      child: Text('No hearts received yet!'),
                     ),
                   ),
                 );

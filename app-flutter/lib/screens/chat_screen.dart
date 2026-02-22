@@ -14,6 +14,7 @@ import '../providers/auth_provider.dart';
 import '../providers/match_provider.dart';
 import '../services/socket_service.dart';
 import '../services/api_service.dart';
+import '../services/firebase_service.dart';
 import '../utils/config.dart';
 import 'user_profile_details_screen.dart';
 import 'home_screen.dart';
@@ -48,12 +49,31 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isUploading = false;
   String? _currentUserId;
   DateTime? _clearedAt; // Timestamp when chat was cleared
+  late Map<String, dynamic> _displayUser;
 
   @override
   void initState() {
     super.initState();
+    _displayUser = Map<String, dynamic>.from(widget.otherUser);
+    FirebaseService.setCurrentChatMatchId(widget.matchId);
     _loadClearedState();
     _initializeSocket();
+    _loadSenderProfileIfNeeded();
+  }
+
+  /// When opened from notification we only have id/name; fetch profile and update header image.
+  Future<void> _loadSenderProfileIfNeeded() async {
+    if (_displayUser['profileImage'] != null) return;
+    final userId = _displayUser['id'] ?? _displayUser['_id'];
+    if (userId == null) return;
+    try {
+      final profile = await _apiService.getUserProfile(userId.toString());
+      if (!mounted) return;
+      setState(() {
+        _displayUser = {..._displayUser, ...profile};
+        if (!_displayUser.containsKey('id')) _displayUser['id'] = _displayUser['_id'];
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadClearedState() async {
@@ -203,7 +223,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final currentUserId = authProvider.user?['id'] ?? authProvider.user?['_id'] ?? '';
-    final receiverId = widget.otherUser['id'] ?? widget.otherUser['_id'] ?? '';
+    final receiverId = _displayUser['id'] ?? _displayUser['_id'] ?? '';
 
     // Add temporary message to UI immediately
     final tempMessage = {
@@ -658,7 +678,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _reportUser(String reason, String description) async {
     try {
-      final reportedUserId = widget.otherUser['id'] ?? widget.otherUser['_id'] ?? '';
+      final reportedUserId = _displayUser['id'] ?? _displayUser['_id'] ?? '';
       await _apiService.reportUser(reportedUserId, reason, description: description);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -739,6 +759,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    FirebaseService.setCurrentChatMatchId(null);
     _messageController.dispose();
     _scrollController.dispose();
     _socket?.off('new_message');
@@ -750,8 +771,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildProfileImage() {
-    final profileImageUrl = widget.otherUser['profileImage'] != null
-        ? AppConfig.buildImageUrl(widget.otherUser['profileImage'])
+    final profileImageUrl = _displayUser['profileImage'] != null
+        ? AppConfig.buildImageUrl(_displayUser['profileImage'])
         : null;
 
     if (profileImageUrl != null) {
@@ -958,7 +979,7 @@ class _ChatScreenState extends State<ChatScreen> {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => UserProfileDetailsScreen(user: widget.otherUser),
+                builder: (_) => UserProfileDetailsScreen(user: _displayUser),
               ),
             );
           },
@@ -972,7 +993,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     backgroundColor: Colors.white,
                     child: _buildProfileImage(),
                   ),
-                  if (_isUserActive(widget.otherUser['lastSeenAt']))
+                  if (_isUserActive(_displayUser['lastSeenAt']))
                     Positioned(
                       right: -2,
                       bottom: -2,
@@ -997,7 +1018,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.otherUser['name'] ?? 'Chat',
+                      _displayUser['name'] ?? 'Chat',
                       style: const TextStyle(fontSize: 16),
                     ),
                     if (widget.location != null)
@@ -1118,7 +1139,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           final isMe = message['senderId'] == _currentUserId;
                           final sentAt = message['sentAt'] as String?;
                           // Received messages use sender's (other user's) gender tertiary color
-                          final receivedTertiary = AppColors.fromGender(widget.otherUser['gender']).tertiary;
+                          final receivedTertiary = AppColors.fromGender(_displayUser['gender']).tertiary;
 
                           return Align(
                             alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,

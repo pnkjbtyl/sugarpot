@@ -5,6 +5,7 @@ const Match = require('../models/Match');
 const Message = require('../models/Message');
 const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
+const { sendHeartRequestNotification, sendHeartAcceptedNotification } = require('../services/fcmService');
 
 // Swipe right (like) on a user
 router.post('/swipe', authenticateToken, async (req, res) => {
@@ -157,6 +158,52 @@ router.get('/my-matches', authenticateToken, async (req, res) => {
   }
 });
 
+// Notify receiver of a new heart request (FCM)
+async function sendHeartRequestToReceiver(senderId, receiverId, matchId) {
+  try {
+    const [receiver, sender] = await Promise.all([
+      User.findById(receiverId).select('firebaseToken').lean(),
+      User.findById(senderId).select('name').lean(),
+    ]);
+    const token = receiver?.firebaseToken;
+    const senderName = sender?.name || 'Someone';
+    if (token) {
+      const result = await sendHeartRequestNotification(token, senderName, {
+        matchId,
+        senderId: String(senderId),
+      });
+      if (result && result.invalidToken) {
+        await User.findByIdAndUpdate(receiverId, { $unset: { firebaseToken: 1 } });
+      }
+    }
+  } catch (e) {
+    console.warn('Heart request FCM failed:', e.message);
+  }
+}
+
+// Notify heart sender that their request was accepted (FCM)
+async function sendHeartAcceptedToSender(senderId, accepterId, matchId) {
+  try {
+    const [sender, accepter] = await Promise.all([
+      User.findById(senderId).select('firebaseToken').lean(),
+      User.findById(accepterId).select('name').lean(),
+    ]);
+    const token = sender?.firebaseToken;
+    const accepterName = accepter?.name || 'Someone';
+    if (token) {
+      const result = await sendHeartAcceptedNotification(token, accepterName, {
+        matchId,
+        accepterId: String(accepterId),
+      });
+      if (result && result.invalidToken) {
+        await User.findByIdAndUpdate(senderId, { $unset: { firebaseToken: 1 } });
+      }
+    }
+  } catch (e) {
+    console.warn('Heart accepted FCM failed:', e.message);
+  }
+}
+
 // Send heart request to a user
 router.post('/heart-request', authenticateToken, async (req, res) => {
   try {
@@ -181,8 +228,10 @@ router.post('/heart-request', authenticateToken, async (req, res) => {
         match.status = 'matched';
         match.updatedAt = Date.now();
         await match.save();
-        return res.json({ 
-          message: 'It\'s a match!', 
+        // Notify the heart sender (user1) that their request was accepted
+        await sendHeartAcceptedToSender(match.user1.toString(), req.userId, match._id.toString());
+        return res.json({
+          message: 'It\'s a match!',
           match: true,
           matchData: match
         });
@@ -201,6 +250,7 @@ router.post('/heart-request', authenticateToken, async (req, res) => {
       match.user2 = targetUserId;
       match.updatedAt = Date.now();
       await match.save();
+      await sendHeartRequestToReceiver(req.userId, targetUserId, match._id.toString());
       return res.json({ message: 'Heart request sent!', match: false, matchData: match });
     }
 
@@ -212,6 +262,7 @@ router.post('/heart-request', authenticateToken, async (req, res) => {
     });
 
     await match.save();
+    await sendHeartRequestToReceiver(req.userId, targetUserId, match._id.toString());
     res.json({ message: 'Heart request sent!', match: false, matchData: match });
   } catch (error) {
     res.status(500).json({ message: error.message });

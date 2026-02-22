@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Message = require('../models/Message');
 const Match = require('../models/Match');
+const { sendChatNotification } = require('../services/fcmService');
 
 // Store user socket connections: userId -> socketId
 const userSockets = new Map();
@@ -136,6 +137,28 @@ module.exports = (io) => {
         } else {
           // Receiver is offline - emit to receiver's room (they'll get it when they connect)
           io.to(`user_${receiverId}`).emit('new_message', messagePayload);
+        }
+
+        // Send FCM chat notification to receiver (app will hide if chat screen is open)
+        try {
+          const [receiver, sender] = await Promise.all([
+            User.findById(receiverId).select('firebaseToken').lean(),
+            User.findById(senderId).select('name').lean(),
+          ]);
+          const receiverToken = receiver?.firebaseToken;
+          const senderName = sender?.name || 'Someone';
+          const notifBody = (messagePayload.messageType === 'text' && messagePayload.messageText)
+            ? String(messagePayload.messageText).substring(0, 200)
+            : (messagePayload.messageType === 'image' ? '[Image]' : messagePayload.messageType === 'video' ? '[Video]' : messagePayload.messageType === 'audio' ? '[Audio]' : 'New message');
+          if (receiverToken) {
+            await sendChatNotification(receiverToken, senderName, notifBody, {
+              matchId: String(matchId),
+              senderId: String(senderId),
+              senderName,
+            });
+          }
+        } catch (fcmErr) {
+          console.warn('FCM chat notification failed:', fcmErr.message);
         }
       } catch (error) {
         console.error('Error sending message:', error);

@@ -1,5 +1,7 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import 'otp_verification_screen.dart';
 import '../theme/app_colors.dart';
@@ -14,6 +16,8 @@ class GetStartedScreen extends StatefulWidget {
 class _GetStartedScreenState extends State<GetStartedScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+  bool _acceptedTerms = false;
+  static const String _termsUrl = 'https://shree.systems/sugarpot/terms-of-service';
 
   @override
   void dispose() {
@@ -21,7 +25,15 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
     super.dispose();
   }
 
+  Future<void> _openTerms() async {
+    final uri = Uri.parse(_termsUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   Future<void> _sendOtp() async {
+    if (!_acceptedTerms) return;
     if (_formKey.currentState!.validate()) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final success = await authProvider.sendOtp(_emailController.text.trim());
@@ -92,13 +104,53 @@ class _GetStartedScreenState extends State<GetStartedScreen> {
                       return null;
                     },
                   ),
+                  const SizedBox(height: 20),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: Checkbox(
+                          value: _acceptedTerms,
+                          onChanged: (value) => setState(() => _acceptedTerms = value ?? false),
+                          activeColor: context.appPrimaryColor,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text.rich(
+                            TextSpan(
+                              style: TextStyle(fontSize: 14, color: Colors.grey[700], height: 1.4),
+                              children: [
+                                const TextSpan(text: 'I am 18 (or more) years old and I accept '),
+                                TextSpan(
+                                  text: 'Terms of Service',
+                                  style: TextStyle(
+                                    color: context.appPrimaryColor,
+                                    fontWeight: FontWeight.w600,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                  recognizer: TapGestureRecognizer()..onTap = _openTerms,
+                                ),
+                                const TextSpan(text: '.'),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 24),
                   Consumer<AuthProvider>(
                     builder: (context, authProvider, _) {
                       return SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: authProvider.isLoading ? null : _sendOtp,
+                          onPressed: (authProvider.isLoading || !_acceptedTerms) ? null : _sendOtp,
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             backgroundColor: context.appPrimaryColor,

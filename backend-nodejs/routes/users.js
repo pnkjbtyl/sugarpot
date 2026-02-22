@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Match = require('../models/Match');
 const Otp = require('../models/Otp');
 const { authenticateToken } = require('../middleware/auth');
 const { sendOTPEmail } = require('../services/emailService');
@@ -253,7 +254,7 @@ router.post('/refresh-token', authenticateToken, async (req, res) => {
   }
 });
 
-// Get user profile
+// Get user profile (current user)
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
@@ -261,6 +262,37 @@ router.get('/profile', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get another user's profile by id (only if in a match with current user; for chat header etc.)
+router.get('/profile/:userId', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const match = await Match.findOne({
+      status: 'matched',
+      $or: [
+        { user1: req.userId, user2: userId },
+        { user1: userId, user2: req.userId },
+      ],
+    });
+    if (!match) {
+      return res.status(404).json({ message: 'User not found or not matched' });
+    }
+    const user = await User.findById(userId).select('name profileImage gender lastSeenAt').lean();
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json({
+      id: user._id.toString(),
+      _id: user._id.toString(),
+      name: user.name,
+      profileImage: user.profileImage,
+      gender: user.gender,
+      lastSeenAt: user.lastSeenAt,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -346,6 +378,15 @@ router.put('/profile', authenticateToken, async (req, res) => {
       updates.lastSeenAt = new Date(updates.lastSeenAt);
     }
 
+    // findByIdAndUpdate does not run pre('save'), so set isOnboardingComplete here when all required fields are present
+    const name = updates.name !== undefined ? updates.name : existingUser.name;
+    const dateOfBirth = updates.dateOfBirth !== undefined ? updates.dateOfBirth : existingUser.dateOfBirth;
+    const gender = updates.gender !== undefined ? updates.gender : existingUser.gender;
+    const profileImage = updates.profileImage !== undefined ? updates.profileImage : existingUser.profileImage;
+    if (name && dateOfBirth && gender && profileImage) {
+      updates.isOnboardingComplete = true;
+    }
+
     const user = await User.findByIdAndUpdate(
       req.userId,
       { ...updates, updatedAt: Date.now() },
@@ -375,7 +416,6 @@ router.put('/profile', authenticateToken, async (req, res) => {
       });
     }
 
-    // Check onboarding status will be updated automatically by pre-save hook
     res.json(user);
   } catch (error) {
     res.status(400).json({ message: error.message });

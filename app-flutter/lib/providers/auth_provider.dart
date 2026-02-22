@@ -20,33 +20,29 @@ class AuthProvider with ChangeNotifier {
   bool get isAuthenticated => _user != null;
   bool get isOnboardingComplete => _user?['isOnboardingComplete'] == true;
 
-  // Check which onboarding page should be shown based on missing fields
-  // Returns -1 if all fields are complete, otherwise returns the page index (0-3)
+  // Check which onboarding page should be shown based on missing fields and server flag.
+  // Returns -1 only when server says onboarding is complete; otherwise page index (0-3).
   int getMissingOnboardingPage() {
     if (_user == null) return 0;
-    
-    // Page 0: Name and Date of Birth
+
+    // If server says onboarding not complete, always send to onboarding (use first missing page or 0).
+    if (_user!['isOnboardingComplete'] != true) {
+      // Which page to show: first missing field or page 0
+      if (_user!['name'] == null || _user!['name'].toString().trim().isEmpty ||
+          _user!['dateOfBirth'] == null) return 0;
+      if (_user!['gender'] == null) return 1;
+      if (_user!['profileImage'] == null || _user!['profileImage'].toString().trim().isEmpty) return 2;
+      if (_user!['pickupLine'] == null || _user!['pickupLine'].toString().trim().isEmpty) return 3;
+      return 0; // All fields present but server flag false → show first page so they can complete
+    }
+
+    // Server says complete; double-check required fields for which page to show if ever inconsistent
     if (_user!['name'] == null || _user!['name'].toString().trim().isEmpty ||
-        _user!['dateOfBirth'] == null) {
-      return 0;
-    }
-    
-    // Page 1: Gender
-    if (_user!['gender'] == null) {
-      return 1;
-    }
-    
-    // Page 2: Profile Image
-    if (_user!['profileImage'] == null || _user!['profileImage'].toString().trim().isEmpty) {
-      return 2;
-    }
-    
-    // Page 3: Pickup Line
-    if (_user!['pickupLine'] == null || _user!['pickupLine'].toString().trim().isEmpty) {
-      return 3;
-    }
-    
-    // All fields are complete
+        _user!['dateOfBirth'] == null) return 0;
+    if (_user!['gender'] == null) return 1;
+    if (_user!['profileImage'] == null || _user!['profileImage'].toString().trim().isEmpty) return 2;
+    if (_user!['pickupLine'] == null || _user!['pickupLine'].toString().trim().isEmpty) return 3;
+
     return -1;
   }
 
@@ -101,12 +97,14 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Complete onboarding
+  // Complete onboarding.
+  // For backward compatibility: pass either profileImage (new file) or existingProfileImageUrl (keep existing).
   Future<bool> completeOnboarding({
     required String name,
     required DateTime dateOfBirth,
     required String gender,
-    required File profileImage,
+    File? profileImage,
+    String? existingProfileImageUrl,
     required String pickupLine,
     required double latitude,
     required double longitude,
@@ -119,16 +117,19 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Upload profile image first
+      // Upload new profile image if provided; otherwise keep existing URL
       String? imageUrl;
-      try {
-        final uploadResponse = await _apiService.uploadProfileImage(profileImage);
-        if (uploadResponse['imageUrl'] != null) {
-          imageUrl = uploadResponse['imageUrl'];
+      if (profileImage != null) {
+        try {
+          final uploadResponse = await _apiService.uploadProfileImage(profileImage);
+          if (uploadResponse['imageUrl'] != null) {
+            imageUrl = uploadResponse['imageUrl'];
+          }
+        } catch (e) {
+          debugPrint('Error uploading image: $e');
         }
-      } catch (e) {
-        debugPrint('Error uploading image: $e');
-        // Continue without image URL for now
+      } else if (existingProfileImageUrl != null && existingProfileImageUrl.trim().isNotEmpty) {
+        imageUrl = existingProfileImageUrl.trim();
       }
 
       // Update profile

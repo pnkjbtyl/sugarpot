@@ -20,8 +20,10 @@ import '../theme/app_colors.dart';
 
 class HomeScreen extends StatefulWidget {
   final int? initialIndex;
-  
-  const HomeScreen({super.key, this.initialIndex});
+  /// When non-null, Matches tab (index 2) will open this sub-tab (0 = Matches, 1 = Received Hearts).
+  final int? initialMatchesTabIndex;
+
+  const HomeScreen({super.key, this.initialIndex, this.initialMatchesTabIndex});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -447,7 +449,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildProfileScreen(),
           SwipeScreen(key: swipeScreenKey),
-          const MatchesScreen(),
+          MatchesScreen(initialTabIndex: widget.initialMatchesTabIndex),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(

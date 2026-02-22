@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'app_navigator.dart';
 import 'screens/splash_screen.dart';
 import 'screens/get_started_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -35,6 +36,7 @@ void main() async {
   
   // Setup Firebase Messaging
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  await FirebaseService.init();
   FirebaseService.setupForegroundHandler();
   FirebaseService.setupNotificationHandlers();
   
@@ -79,13 +81,24 @@ class MyApp extends StatelessWidget {
         builder: (context, auth, _) {
           final colors = AppColors.fromGender(auth.user?['gender']);
           return MaterialApp(
+            navigatorKey: navigatorKey,
             title: 'SugarPot',
             theme: _buildTheme(colors),
             home: const SplashScreen(),
             routes: {
               '/get-started': (context) => const GetStartedScreen(),
               '/onboarding': (context) => const OnboardingScreen(),
-              '/home': (context) => const HomeScreen(),
+              '/home': (context) {
+                final args = ModalRoute.of(context)?.settings.arguments;
+                if (args is Map) {
+                  return HomeScreen(
+                    initialIndex: args['tab'] as int? ?? 1,
+                    initialMatchesTabIndex: args['matchesTab'] as int?,
+                  );
+                }
+                final index = args as int?;
+                return HomeScreen(initialIndex: index ?? 1);
+              },
             },
             debugShowCheckedModeBanner: false,
           );
