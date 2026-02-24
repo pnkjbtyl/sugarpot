@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:convert';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -5,8 +7,11 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:provider/provider.dart';
 
 import '../app_navigator.dart';
+import '../providers/auth_provider.dart';
+import '../providers/match_provider.dart';
 import '../screens/chat_screen.dart';
 
 class FirebaseService {
@@ -15,8 +20,49 @@ class FirebaseService {
   /// Match ID of the chat screen currently open, or null. Used to avoid showing a notification when user is already in that chat.
   static String? currentChatMatchId;
 
+  /// True when user is on Matches tab (HomeScreen, index 2) with no ChatScreen on top. Set by HomeScreen/ChatScreen.
+  static bool _isOnMatchesScreen = false;
+  static void setOnMatchesScreen(bool value) {
+    _isOnMatchesScreen = value;
+  }
+  static bool get isOnMatchesScreen => _isOnMatchesScreen;
+
+  /// Callback to refresh the current chat. Set by ChatScreen when it mounts, cleared when it disposes.
+  static String? _refreshChatMatchId;
+  static void Function()? _onRefreshChat;
+
   static void setCurrentChatMatchId(String? matchId) {
     currentChatMatchId = matchId;
+  }
+
+  static void registerChatRefresh(String matchId, void Function() onRefresh) {
+    _refreshChatMatchId = matchId;
+    _onRefreshChat = onRefresh;
+  }
+
+  static void unregisterChatRefresh(String matchId) {
+    if (_refreshChatMatchId == matchId) {
+      _refreshChatMatchId = null;
+      _onRefreshChat = null;
+    }
+  }
+
+  /// If the open chat is for [matchId], trigger refresh and return true. Otherwise return false.
+  static bool tryRefreshChatIfSame(String matchId) {
+    if (currentChatMatchId == matchId && _refreshChatMatchId == matchId && _onRefreshChat != null) {
+      _onRefreshChat!();
+      return true;
+    }
+    return false;
+  }
+
+  /// Ensures AuthProvider has loaded user, then runs [callback]. Use async callback to land on Matches, fetch matches, then open chat.
+  static Future<void> _ensureUserLoadedThen(Future<void> Function() callback) async {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+    await Provider.of<AuthProvider>(context, listen: false).loadUser();
+    if (!context.mounted) return;
+    await callback();
   }
 
   static final FlutterLocalNotificationsPlugin _localNotifications =
@@ -35,20 +81,20 @@ class FirebaseService {
     const initSettings = InitializationSettings(android: android);
     await _localNotifications.initialize(
       initSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
         if (response.payload == null || response.payload!.isEmpty) return;
         try {
           final data = jsonDecode(response.payload!) as Map<String, dynamic>;
           final type = data['type'] as String?;
           if (type == 'heart_request') {
-            _openReceivedHearts();
+            _ensureUserLoadedThen(() async => _openReceivedHearts());
           } else if (type == 'heart_accepted') {
-            _openChatFromHeartAcceptedPayload(response.payload!);
+            _ensureUserLoadedThen(() => _openChatFromHeartAcceptedPayload(response.payload!));
           } else {
-            _openChatFromPayload(response.payload!);
+            _ensureUserLoadedThen(() => _openChatFromPayload(response.payload!));
           }
         } catch (_) {
-          _openChatFromPayload(response.payload!);
+          _ensureUserLoadedThen(() => _openChatFromPayload(response.payload!));
         }
       },
     );
@@ -62,7 +108,7 @@ class FirebaseService {
         ));
   }
 
-  static void _openChatFromPayload(String payloadStr) {
+  static Future<void> _openChatFromPayload(String payloadStr) async {
     try {
       final data = jsonDecode(payloadStr) as Map<String, dynamic>;
       final matchId = data['matchId'] as String?;
@@ -73,8 +119,34 @@ class FirebaseService {
       final nav = navigatorKey.currentState;
       if (nav == null || !nav.mounted) return;
 
-      // So Back from chat goes to Chat index (Matches tab = index 2): put Home(Matches) under Chat via named route (keeps theme).
+      // 1. Same chat already open: just refresh and return
+      if (tryRefreshChatIfSame(matchId)) return;
+
+      // 2. Already on Matches screen: skip navigate and fetch, just push chat
+      if (isOnMatchesScreen) {
+        nav.push(
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              matchId: matchId,
+              otherUser: {'id': senderId, 'name': senderName ?? 'Unknown'},
+            ),
+          ),
+        );
+        return;
+      }
+
+      // 3. Land on Matches tab first, fetch matches, then open chat
       nav.pushNamedAndRemoveUntil('/home', (route) => false, arguments: 2);
+
+      final frameDone = Completer<void>();
+      WidgetsBinding.instance.addPostFrameCallback((_) => frameDone.complete());
+      await frameDone.future;
+
+      final context = navigatorKey.currentContext;
+      if (context == null || !context.mounted) return;
+      await Provider.of<MatchProvider>(context, listen: false).loadMyMatches();
+      if (!context.mounted) return;
+
       nav.push(
         MaterialPageRoute(
           builder: (_) => ChatScreen(
@@ -100,7 +172,7 @@ class FirebaseService {
   }
 
   /// Open chat with the user who accepted the heart (heart_accepted notification tap).
-  static void _openChatFromHeartAcceptedPayload(String payloadStr) {
+  static Future<void> _openChatFromHeartAcceptedPayload(String payloadStr) async {
     try {
       final data = jsonDecode(payloadStr) as Map<String, dynamic>;
       final matchId = data['matchId'] as String?;
@@ -111,7 +183,31 @@ class FirebaseService {
       final nav = navigatorKey.currentState;
       if (nav == null || !nav.mounted) return;
 
+      if (tryRefreshChatIfSame(matchId)) return;
+
+      if (isOnMatchesScreen) {
+        nav.push(
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              matchId: matchId,
+              otherUser: {'id': accepterId, 'name': accepterName ?? 'Unknown'},
+            ),
+          ),
+        );
+        return;
+      }
+
       nav.pushNamedAndRemoveUntil('/home', (route) => false, arguments: 2);
+
+      final frameDone = Completer<void>();
+      WidgetsBinding.instance.addPostFrameCallback((_) => frameDone.complete());
+      await frameDone.future;
+
+      final context = navigatorKey.currentContext;
+      if (context == null || !context.mounted) return;
+      await Provider.of<MatchProvider>(context, listen: false).loadMyMatches();
+      if (!context.mounted) return;
+
       nav.push(
         MaterialPageRoute(
           builder: (_) => ChatScreen(
@@ -228,16 +324,16 @@ class FirebaseService {
           'senderId': data['senderId'],
           'senderName': data['senderName'],
         });
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _openChatFromPayload(payload);
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          await _ensureUserLoadedThen(() => _openChatFromPayload(payload));
         });
       } else if (type == 'heart_request') {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _openReceivedHearts();
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          await _ensureUserLoadedThen(() async => _openReceivedHearts());
         });
       } else if (type == 'heart_accepted') {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _openChatFromHeartAcceptedPayload(jsonEncode(message.data));
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          await _ensureUserLoadedThen(() => _openChatFromHeartAcceptedPayload(jsonEncode(message.data)));
         });
       }
     });
@@ -245,11 +341,11 @@ class FirebaseService {
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       final type = message.data['type'] as String?;
       if (type == 'chat') {
-        _openChatFromPayload(jsonEncode(message.data));
+        _ensureUserLoadedThen(() => _openChatFromPayload(jsonEncode(message.data)));
       } else if (type == 'heart_request') {
-        _openReceivedHearts();
+        _ensureUserLoadedThen(() async => _openReceivedHearts());
       } else if (type == 'heart_accepted') {
-        _openChatFromHeartAcceptedPayload(jsonEncode(message.data));
+        _ensureUserLoadedThen(() => _openChatFromHeartAcceptedPayload(jsonEncode(message.data)));
       }
     });
   }

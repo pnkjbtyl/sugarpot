@@ -59,9 +59,26 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _displayUser = Map<String, dynamic>.from(widget.otherUser);
     FirebaseService.setCurrentChatMatchId(widget.matchId);
+    FirebaseService.setOnMatchesScreen(false);
+    FirebaseService.registerChatRefresh(widget.matchId, _requestMessagesAgain);
     _loadClearedState();
     _initializeSocket();
     _loadSenderProfileIfNeeded();
+  }
+
+  /// Re-request message history (e.g. when user taps notification for this same chat).
+  void _requestMessagesAgain() {
+    if (!mounted) return;
+    if (_socket != null && _socket!.connected) {
+      setState(() => _isLoading = true);
+      _socket!.emit('get_messages', {
+        'matchId': widget.matchId,
+        'limit': 50
+      });
+    } else {
+      setState(() => _isLoading = true);
+      _initializeSocket();
+    }
   }
 
   /// When opened from notification we only have id/name; fetch profile and update header image.
@@ -694,6 +711,8 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     FirebaseService.setCurrentChatMatchId(null);
+    FirebaseService.unregisterChatRefresh(widget.matchId);
+    FirebaseService.setOnMatchesScreen(true);
     _messageController.dispose();
     _scrollController.dispose();
     _socket?.off('new_message');

@@ -6,8 +6,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../providers/auth_provider.dart';
-import '../services/firebase_service.dart';
 import '../services/api_service.dart';
+import '../services/firebase_service.dart';
 import '../utils/config.dart';
 import 'swipe_screen.dart' show SwipeScreen, swipeScreenKey;
 import 'matches_screen.dart';
@@ -65,6 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     // Default to People (middle tab) or use provided initialIndex
     _currentIndex = widget.initialIndex ?? 1;
+    if (_currentIndex == 2) FirebaseService.setOnMatchesScreen(true);
     // Request permissions when Home Screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _requestPermissions();
@@ -456,6 +457,11 @@ class _HomeScreenState extends State<HomeScreen> {
         currentIndex: _currentIndex,
         onTap: (index) {
           setState(() => _currentIndex = index);
+          if (index == 2) {
+            FirebaseService.setOnMatchesScreen(true);
+          } else {
+            FirebaseService.setOnMatchesScreen(false);
+          }
           // Capture location when user switches to People tab (index 1)
           if (index == 1) {
             debugPrint('People tab selected - attempting to capture location');
