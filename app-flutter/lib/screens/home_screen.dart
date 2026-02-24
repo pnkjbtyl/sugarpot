@@ -279,12 +279,12 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       try {
-        // Compress image to max 800px width with 85% quality
+        // Compress image to max 720px width with 85% quality
         final compressedFile = await FlutterImageCompress.compressAndGetFile(
           image.path,
           '${image.path}_compressed.jpg',
-          minWidth: 800,
-          minHeight: 800,
+          minWidth: 720,
+          minHeight: 720,
           quality: 85,
           keepExif: false,
         );

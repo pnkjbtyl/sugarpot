@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:video_compress/video_compress.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
@@ -15,6 +17,7 @@ import '../providers/match_provider.dart';
 import '../services/socket_service.dart';
 import '../services/api_service.dart';
 import '../services/firebase_service.dart';
+import '../services/chat_media_cache.dart';
 import '../utils/config.dart';
 import 'user_profile_details_screen.dart';
 import 'home_screen.dart';
@@ -174,11 +177,11 @@ class _ChatScreenState extends State<ChatScreen> {
         'limit': 50
       });
 
-      // Mark existing messages as delivered
+      // Mark existing messages as delivered (only messages I received - I'm the receiver)
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final undeliveredIds = _messages
             .where((msg) => 
-              msg['senderId'] == _currentUserId && 
+              msg['receiverId'] == _currentUserId && 
               !msg['isDelivered'] && 
               msg['id'] != null
             )
@@ -284,8 +287,8 @@ class _ChatScreenState extends State<ChatScreen> {
       final result = await FlutterImageCompress.compressAndGetFile(
         imageFile.absolute.path,
         '${imageFile.path}_compressed.jpg',
-        minWidth: 800,
-        minHeight: 800,
+        minWidth: 720,
+        minHeight: 720,
         quality: 85,
         keepExif: false,
       );
@@ -300,50 +303,20 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       // Check original file size first
       final originalSize = await videoFile.length();
-      final maxSize = 200 * 1024 * 1024; // 200MB
+      final maxSize = 200 * 1024 * 1024; // 200MB (200×1024×1024)
       
       debugPrint('[COMPRESS] Original video size: ${(originalSize / 1024 / 1024).toStringAsFixed(2)}MB');
       
-      // Compress video with aggressive settings to reduce size
-      debugPrint('[COMPRESS] Starting video compression...');
+      // Compress video to 960x540 (Res960x540Quality)
+      debugPrint('[COMPRESS] Starting video compression (Res960x540Quality)...');
       
       try {
-        // Try resolution-based quality first to force lower resolution (closest to 800px width)
-        // Res960x540Quality = 960x540 (closest to 800px width constraint)
-        debugPrint('[COMPRESS] Attempting compression with Res960x540Quality (960x540 resolution)...');
-        MediaInfo? mediaInfo;
-        
-        try {
-          mediaInfo = await VideoCompress.compressVideo(
-            videoFile.path,
-            quality: VideoQuality.Res960x540Quality, // Force 960x540 resolution (closest to 800px width)
-            deleteOrigin: false,
-            includeAudio: true,
-          );
-          debugPrint('[COMPRESS] Res960x540Quality compression completed');
-        } catch (e) {
-          debugPrint('[COMPRESS] Res960x540Quality failed: $e, trying Res640x480Quality...');
-          // Fallback to lower resolution
-          try {
-            mediaInfo = await VideoCompress.compressVideo(
-              videoFile.path,
-              quality: VideoQuality.Res640x480Quality, // Force 640x480 resolution
-              deleteOrigin: false,
-              includeAudio: true,
-            );
-            debugPrint('[COMPRESS] Res640x480Quality compression completed');
-          } catch (e2) {
-            debugPrint('[COMPRESS] Res640x480Quality also failed: $e2, trying LowQuality...');
-            // Final fallback to quality-based compression
-            mediaInfo = await VideoCompress.compressVideo(
-              videoFile.path,
-              quality: VideoQuality.LowQuality,
-              deleteOrigin: false,
-              includeAudio: true,
-            );
-            debugPrint('[COMPRESS] LowQuality compression completed');
-          }
-        }
+        final mediaInfo = await VideoCompress.compressVideo(
+          videoFile.path,
+          quality: VideoQuality.Res960x540Quality,
+          deleteOrigin: false,
+          includeAudio: true,
+        );
         
         debugPrint('[COMPRESS] VideoCompress.compressVideo completed');
         debugPrint('[COMPRESS] MediaInfo: ${mediaInfo?.path ?? "null"}');
@@ -352,37 +325,6 @@ class _ChatScreenState extends State<ChatScreen> {
           final compressedFile = File(mediaInfo.path!);
           
           debugPrint('[COMPRESS] Compressed file path: ${compressedFile.path}');
-          debugPrint('[COMPRESS] Original file path: ${videoFile.path}');
-          debugPrint('[COMPRESS] Are paths the same? ${compressedFile.path == videoFile.path}');
-          
-          // Check if compression actually created a different file
-          if (compressedFile.path == videoFile.path) {
-            debugPrint('[COMPRESS] WARNING: Compressed file path is same as original - compression may not have occurred');
-            debugPrint('[COMPRESS] Trying DefaultQuality as last resort...');
-            try {
-              final fallbackInfo = await VideoCompress.compressVideo(
-                videoFile.path,
-                quality: VideoQuality.DefaultQuality,
-                deleteOrigin: false,
-                includeAudio: true,
-              );
-              if (fallbackInfo != null && fallbackInfo.path != null && fallbackInfo.path!.isNotEmpty) {
-                final fallbackFile = File(fallbackInfo.path!);
-                if (fallbackFile.path != videoFile.path) {
-                  debugPrint('[COMPRESS] Using DefaultQuality result');
-                  mediaInfo = fallbackInfo;
-                }
-              }
-            } catch (e) {
-              debugPrint('[COMPRESS] DefaultQuality also failed: $e');
-            }
-          }
-          
-          // Re-validate mediaInfo after potential fallback reassignment
-          if (mediaInfo == null || mediaInfo.path == null || mediaInfo.path!.isEmpty) {
-            debugPrint('[COMPRESS] MediaInfo is null or path is empty after fallback attempt');
-            return null;
-          }
           
           final finalFile = File(mediaInfo.path!);
           
@@ -399,14 +341,6 @@ class _ChatScreenState extends State<ChatScreen> {
             debugPrint('[COMPRESS] Compressed video size: ${(compressedSize / 1024 / 1024).toStringAsFixed(2)}MB');
             debugPrint('[COMPRESS] Size reduction: ${((originalSize - compressedSize) / 1024 / 1024).toStringAsFixed(2)}MB (${((1 - compressedSize / originalSize) * 100).toStringAsFixed(1)}%)');
             
-            // Check if compression actually reduced size (at least 5% reduction)
-            if (compressedSize >= originalSize * 0.95) {
-              debugPrint('[COMPRESS] WARNING: Compression didn\'t reduce size significantly (less than 5% reduction)');
-              debugPrint('[COMPRESS] This may indicate video_compress is not working properly for this video format');
-              // Still return the file if it's under the limit
-            }
-            
-            // Check if compressed file is still too large
             if (compressedSize > maxSize) {
               debugPrint('[COMPRESS] Warning: Compressed video still exceeds size limit (${(compressedSize / 1024 / 1024).toStringAsFixed(2)}MB > ${(maxSize / 1024 / 1024).toStringAsFixed(2)}MB)');
               return null;
@@ -485,7 +419,7 @@ class _ChatScreenState extends State<ChatScreen> {
         } else {
           // Check if original is under limit
           final originalSize = await file.length();
-          final maxSize = 200 * 1024 * 1024; // 200MB
+          final maxSize = 200 * 720 * 720; // ~99MB (200×720×720)
           if (originalSize <= maxSize) {
             debugPrint('[CHAT_UPLOAD] Video compression failed but original is under limit, using original');
             fileToUpload = file;
@@ -497,7 +431,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    'Video compression failed. File size is ${(originalSize / 1024 / 1024).toStringAsFixed(1)}MB. Maximum size is 200MB after compression. Please try again or select a smaller video.',
+                    'Video compression failed. File size is ${(originalSize / 1024 / 1024).toStringAsFixed(1)}MB. Maximum size is ~99MB after compression. Please try again or select a smaller video.',
                   ),
                   backgroundColor: Colors.red,
                   duration: const Duration(seconds: 5),
@@ -863,91 +797,163 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
     } else if (messageType == 'image') {
-      final imageUrl = messageText.startsWith('http') ? messageText : AppConfig.buildImageUrl(messageText);
-      return GestureDetector(
-        onTap: () {
-          showDialog(
-            context: context,
-            barrierColor: context.appPrimaryColor,
-            barrierDismissible: true,
-            builder: (context) => Dialog(
-              backgroundColor: Colors.transparent,
-              insetPadding: EdgeInsets.zero,
-              child: Stack(
-                children: [
-                  Center(
-                    child: InteractiveViewer(
-                      minScale: 0.5,
-                      maxScale: 4.0,
-                      child: SizedBox(
-                        width: MediaQuery.of(context).size.width,
-                        height: MediaQuery.of(context).size.height,
-                        child: CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          fit: BoxFit.contain,
-                          placeholder: (context, url) => const Center(
-                            child: CircularProgressIndicator(color: Colors.white),
-                          ),
-                          errorWidget: (context, url, error) => const Center(
-                            child: Icon(Icons.error, color: Colors.white, size: 48),
+      return FutureBuilder<String>(
+        future: ChatMediaCache.instance.getMediaUrl(messageText),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: 140,
+                height: 140,
+                color: Colors.grey[300],
+                child: const Center(child: CircularProgressIndicator()),
+              ),
+            );
+          }
+          final mediaUrl = snapshot.data!;
+          final isFile = mediaUrl.startsWith('file:');
+          return GestureDetector(
+            onTap: () {
+              showDialog(
+                context: context,
+                barrierColor: context.appPrimaryColor,
+                barrierDismissible: true,
+                builder: (dialogContext) => Dialog(
+                  backgroundColor: Colors.transparent,
+                  insetPadding: EdgeInsets.zero,
+                  child: Stack(
+                    children: [
+                      Center(
+                        child: InteractiveViewer(
+                          minScale: 0.5,
+                          maxScale: 4.0,
+                          child: SizedBox(
+                            width: MediaQuery.of(dialogContext).size.width,
+                            height: MediaQuery.of(dialogContext).size.height,
+                            child: isFile
+                                ? Image.file(
+                                    File.fromUri(Uri.parse(mediaUrl)),
+                                    fit: BoxFit.contain,
+                                  )
+                                : CachedNetworkImage(
+                                    imageUrl: mediaUrl,
+                                    fit: BoxFit.contain,
+                                    placeholder: (_, __) => const Center(
+                                      child: CircularProgressIndicator(color: Colors.white),
+                                    ),
+                                    errorWidget: (_, __, ___) => const Center(
+                                      child: Icon(Icons.error, color: Colors.white, size: 48),
+                                    ),
+                                  ),
                           ),
                         ),
                       ),
-                    ),
+                      Positioned(
+                        top: MediaQuery.of(dialogContext).padding.top + 8,
+                        right: 8,
+                        child: IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                        ),
+                      ),
+                    ],
                   ),
-                  Positioned(
-                    top: MediaQuery.of(context).padding.top + 8,
-                    right: 8,
-                    child: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ),
-                ],
+                ),
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 140, maxHeight: 140),
+                child: isFile
+                    ? Image.file(
+                        File.fromUri(Uri.parse(mediaUrl)),
+                        width: 140,
+                        height: 140,
+                        fit: BoxFit.cover,
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: mediaUrl,
+                        width: 140,
+                        height: 140,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          width: 140,
+                          height: 140,
+                          color: Colors.grey[300],
+                          child: const Center(child: CircularProgressIndicator()),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          width: 140,
+                          height: 140,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.error),
+                        ),
+                      ),
               ),
             ),
           );
         },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 250,
-              maxHeight: 250,
-            ),
-            child: CachedNetworkImage(
-              imageUrl: imageUrl,
-              width: 250,
-              height: 250,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => Container(
-                width: 250,
-                height: 250,
-                color: Colors.grey[300],
-                child: const Center(child: CircularProgressIndicator()),
-              ),
-              errorWidget: (context, url, error) => Container(
-                width: 250,
-                height: 250,
-                color: Colors.grey[300],
-                child: const Icon(Icons.error),
-              ),
-            ),
-          ),
-        ),
       );
     } else if (messageType == 'video') {
-      final videoUrl = messageText.startsWith('http') ? messageText : AppConfig.buildImageUrl(messageText);
-      return _VideoMessageWidget(videoUrl: videoUrl);
+      return FutureBuilder<String>(
+        future: ChatMediaCache.instance.getMediaUrl(messageText),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return _buildVideoThumbnailPlaceholder();
+          }
+          return _VideoMessageWidget(mediaUrl: snapshot.data!);
+        },
+      );
     } else if (messageType == 'audio') {
-      final audioUrl = messageText.startsWith('http') ? messageText : AppConfig.buildImageUrl(messageText);
-      return _AudioMessageWidget(audioUrl: audioUrl, isMe: isMe, receivedBubbleColor: receivedTertiary);
+      return FutureBuilder<String>(
+        future: ChatMediaCache.instance.getMediaUrl(messageText),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isMe ? context.appTertiaryColor : (receivedTertiary ?? Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                  SizedBox(width: 8),
+                  Text('Loading...'),
+                ],
+              ),
+            );
+          }
+          return _AudioMessageWidget(
+            audioUrl: snapshot.data!,
+            isMe: isMe,
+            receivedBubbleColor: receivedTertiary,
+          );
+        },
+      );
     }
-    
+
     return Text(
       '[${messageType}]',
       style: TextStyle(
         color: isMe ? Colors.black87 : Colors.black87,
+      ),
+    );
+  }
+
+  Widget _buildVideoThumbnailPlaceholder() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 140,
+        height: 140,
+        color: Colors.grey[300],
+        child: const Center(
+          child: Icon(Icons.play_circle_outline, size: 48, color: Colors.grey),
+        ),
       ),
     );
   }
@@ -1252,155 +1258,189 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-// Video message widget for chat
+// Video message widget: shows thumbnail in bubble, fullscreen player on tap
 class _VideoMessageWidget extends StatefulWidget {
-  final String videoUrl;
+  final String mediaUrl;
 
-  const _VideoMessageWidget({required this.videoUrl});
+  const _VideoMessageWidget({required this.mediaUrl});
 
   @override
   State<_VideoMessageWidget> createState() => _VideoMessageWidgetState();
 }
 
 class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
-  VideoPlayerController? _controller;
-  bool _isInitialized = false;
+  Uint8List? _thumbBytes;
 
   @override
   void initState() {
     super.initState();
-    _initializeVideo();
+    _generateThumbnail();
   }
 
-  Future<void> _initializeVideo() async {
+  Future<void> _generateThumbnail() async {
     try {
-      _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
-      await _controller!.initialize();
-      _controller!.addListener(_videoListener);
-      if (mounted) {
+      final videoPath = widget.mediaUrl.startsWith('file:')
+          ? Uri.parse(widget.mediaUrl).path
+          : widget.mediaUrl;
+      final bytes = await VideoThumbnail.thumbnailData(
+        video: videoPath,
+        imageFormat: ImageFormat.JPEG,
+        maxWidth: 280,
+        quality: 70,
+        timeMs: 0,
+      );
+      if (mounted && bytes != null) {
         setState(() {
-          _isInitialized = true;
+          _thumbBytes = bytes;
         });
       }
     } catch (e) {
-      debugPrint('Error initializing video: $e');
+      debugPrint('Video thumbnail error: $e');
     }
   }
 
-  void _videoListener() {
-    if (mounted) {
-      setState(() {});
+  void _openFullscreen() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black,
+      barrierDismissible: true,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: _FullscreenVideoDialog(mediaUrl: widget.mediaUrl),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _openFullscreen,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 140, maxHeight: 140),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              if (_thumbBytes != null)
+                Image.memory(
+                  _thumbBytes!,
+                  width: 140,
+                  height: 140,
+                  fit: BoxFit.cover,
+                )
+              else
+                Container(
+                  width: 140,
+                  height: 140,
+                  color: Colors.grey[300],
+                  child: const Center(
+                    child: Icon(Icons.play_circle_outline, size: 48, color: Colors.grey),
+                  ),
+                ),
+              Container(
+                color: Colors.black26,
+                child: const Icon(Icons.play_arrow, color: Colors.white, size: 40),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Fullscreen video player dialog (creates controller on open, disposes on close)
+class _FullscreenVideoDialog extends StatefulWidget {
+  final String mediaUrl;
+
+  const _FullscreenVideoDialog({required this.mediaUrl});
+
+  @override
+  State<_FullscreenVideoDialog> createState() => _FullscreenVideoDialogState();
+}
+
+class _FullscreenVideoDialogState extends State<_FullscreenVideoDialog> {
+  VideoPlayerController? _controller;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initVideo();
+  }
+
+  Future<void> _initVideo() async {
+    try {
+      if (widget.mediaUrl.startsWith('file:')) {
+        _controller = VideoPlayerController.file(File(Uri.parse(widget.mediaUrl).path));
+      } else {
+        _controller = VideoPlayerController.networkUrl(Uri.parse(widget.mediaUrl));
+      }
+      await _controller!.initialize();
+      if (mounted) setState(() => _initialized = true);
+    } catch (e) {
+      debugPrint('Fullscreen video init error: $e');
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not load video: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
   @override
   void dispose() {
-    _controller?.removeListener(_videoListener);
     _controller?.dispose();
     super.dispose();
   }
 
-  void _togglePlayPause() {
-    if (_controller == null || !_isInitialized) return;
-
+  void _togglePlay() {
+    if (_controller == null || !_initialized) return;
     if (_controller!.value.isPlaying) {
       _controller!.pause();
     } else {
       _controller!.play();
     }
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_isInitialized || _controller == null) {
-      return ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 250,
-          maxHeight: 250,
+    return Stack(
+      children: [
+        if (_initialized && _controller != null)
+          Center(
+            child: AspectRatio(
+              aspectRatio: _controller!.value.aspectRatio,
+              child: VideoPlayer(_controller!),
+            ),
+          )
+        else
+          const Center(child: CircularProgressIndicator(color: Colors.white)),
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 8,
+          right: 8,
+          child: IconButton(
+            icon: const Icon(Icons.close, color: Colors.white, size: 28),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
         ),
-        child: Container(
-          width: 250,
-          height: 250,
-          color: Colors.grey[300],
-          child: const Center(child: CircularProgressIndicator()),
-        ),
-      );
-    }
-
-    return GestureDetector(
-      onTap: () {
-        showDialog(
-          context: context,
-          barrierColor: context.appPrimaryColor,
-          barrierDismissible: true,
-          builder: (context) => Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: EdgeInsets.zero,
-            child: Stack(
-              children: [
-                Center(
-                  child: AspectRatio(
-                    aspectRatio: _controller!.value.aspectRatio,
-                    child: VideoPlayer(_controller!),
-                  ),
-                ),
-                Positioned(
-                  top: MediaQuery.of(context).padding.top + 8,
-                  right: 8,
-                  child: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ),
-                Positioned(
-                  bottom: MediaQuery.of(context).padding.bottom + 16,
-                  right: 16,
-                  child: FloatingActionButton(
-                    onPressed: _togglePlayPause,
-                    backgroundColor: Colors.black54,
-                    child: Icon(
-                      _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
+        Positioned(
+          bottom: MediaQuery.of(context).padding.bottom + 16,
+          right: 16,
+          child: FloatingActionButton(
+            onPressed: _initialized ? _togglePlay : null,
+            backgroundColor: Colors.black54,
+            child: Icon(
+              _controller?.value.isPlaying == true ? Icons.pause : Icons.play_arrow,
+              color: Colors.white,
             ),
           ),
-        );
-      },
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 250,
-          maxHeight: 250,
         ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: AspectRatio(
-                aspectRatio: _controller!.value.aspectRatio,
-                child: VideoPlayer(_controller!),
-              ),
-            ),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: IconButton(
-                icon: Icon(
-                  _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
-                  color: Colors.white,
-                  size: 48,
-                ),
-                onPressed: _togglePlayPause,
-              ),
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }

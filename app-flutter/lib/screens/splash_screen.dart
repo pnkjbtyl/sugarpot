@@ -21,18 +21,15 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkAuth() async {
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
-    // Try to refresh token if exists
+
+    // Load user as early as possible and wait until it completes before navigating
     try {
       await authProvider.refreshTokenIfNeeded();
     } catch (e) {
       debugPrint('Token refresh error: $e');
     }
-    
+
     await authProvider.loadUser();
 
     if (!mounted) return;

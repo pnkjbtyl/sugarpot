@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:async';
 import 'dart:io';
 import '../providers/auth_provider.dart';
 import '../utils/auth_errors.dart';
@@ -89,12 +90,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         source: ImageSource.gallery,
       );
       if (image != null) {
-        // Compress image to max 800px width with 85% quality
+        // Compress image to max 720px width with 85% quality
         final compressedFile = await FlutterImageCompress.compressAndGetFile(
           image.path,
           '${image.path}_compressed.jpg',
-          minWidth: 800,
-          minHeight: 800,
+          minWidth: 720,
+          minHeight: 720,
           quality: 85,
           keepExif: false,
         );
@@ -204,6 +205,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       if (mounted) {
+        setState(() => _isCompleting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Location services are disabled. Please enable them in your device settings.'),
@@ -220,6 +222,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
         if (mounted) {
+          setState(() => _isCompleting = false);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Location permissions are required to complete your profile. Please grant location access.'),
@@ -234,6 +237,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     if (permission == LocationPermission.deniedForever) {
       if (mounted) {
+        setState(() => _isCompleting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Location permissions are permanently denied. Please enable them in your device settings.'),
@@ -245,20 +249,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       return;
     }
 
-    // Get current location
+    // Get current location (try high accuracy first, then retry with medium if timeout)
     Position position;
     try {
-      position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
-      );
+      try {
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 25),
+        );
+      } on TimeoutException {
+        // Retry with lower accuracy (faster, uses network when available)
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.medium,
+          timeLimit: const Duration(seconds: 20),
+        );
+      }
     } catch (e) {
       if (mounted) {
+        setState(() => _isCompleting = false);
+        final isTimeout = e.toString().contains('TimeoutException');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error getting location: $e'),
+            content: Text(
+              isTimeout
+                  ? 'Location is taking too long. Try moving to a place with better signal, then tap Complete again.'
+                  : 'Error getting location: $e',
+            ),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 6),
           ),
         );
       }

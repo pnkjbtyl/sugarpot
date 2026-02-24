@@ -183,13 +183,17 @@ module.exports = (io) => {
           }
         );
 
-        // Notify sender that messages were delivered
-        const messages = await Message.find({ id: { $in: messageIds } });
-        messages.forEach(message => {
+        // Notify sender only for messages we actually marked delivered (where socket user is receiver)
+        const updatedMessages = await Message.find({
+          id: { $in: messageIds },
+          receiverId: userId,
+          isDelivered: true
+        });
+        updatedMessages.forEach(message => {
           io.to(`user_${message.senderId}`).emit('message_delivered', {
             id: message.id,
             sequenceId: message.sequenceId,
-            deliveredAt: new Date().toISOString()
+            deliveredAt: message.deliveredAt.toISOString()
           });
         });
       } catch (error) {

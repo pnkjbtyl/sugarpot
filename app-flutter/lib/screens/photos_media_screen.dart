@@ -80,8 +80,8 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
       final result = await FlutterImageCompress.compressAndGetFile(
         imageFile.absolute.path,
         '${imageFile.path}_compressed.jpg',
-        minWidth: 800,
-        minHeight: 800,
+        minWidth: 720,
+        minHeight: 720,
         quality: 85,
         keepExif: false,
       );
@@ -201,52 +201,20 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
     try {
       // Check original file size first
       final originalSize = await videoFile.length();
-      final maxSize = 200 * 1024 * 1024; // 200MB
+      final maxSize = 200 * 1024 * 1024; // 200MB (200×1024×1024)
       
       debugPrint('[COMPRESS] Original video size: ${(originalSize / 1024 / 1024).toStringAsFixed(2)}MB');
       
-      // Compress video with aggressive settings to reduce size
-      // Note: video_compress doesn't directly support frame size constraints
-      // Uses resolution-based quality to force lower resolution
-      debugPrint('[COMPRESS] Starting video compression...');
+      // Compress video to 960x540 (Res960x540Quality)
+      debugPrint('[COMPRESS] Starting video compression (Res960x540Quality)...');
       
       try {
-        // Try resolution-based quality first to force lower resolution (closest to 800px width)
-        // Res960x540Quality = 960x540 (closest to 800px width constraint)
-        debugPrint('[COMPRESS] Attempting compression with Res960x540Quality (960x540 resolution)...');
-        MediaInfo? mediaInfo;
-        
-        try {
-          mediaInfo = await VideoCompress.compressVideo(
-            videoFile.path,
-            quality: VideoQuality.Res960x540Quality, // Force 960x540 resolution (closest to 800px width)
-            deleteOrigin: false,
-            includeAudio: true,
-          );
-          debugPrint('[COMPRESS] Res960x540Quality compression completed');
-        } catch (e) {
-          debugPrint('[COMPRESS] Res960x540Quality failed: $e, trying Res640x480Quality...');
-          // Fallback to lower resolution
-          try {
-            mediaInfo = await VideoCompress.compressVideo(
-              videoFile.path,
-              quality: VideoQuality.Res640x480Quality, // Force 640x480 resolution
-              deleteOrigin: false,
-              includeAudio: true,
-            );
-            debugPrint('[COMPRESS] Res640x480Quality compression completed');
-          } catch (e2) {
-            debugPrint('[COMPRESS] Res640x480Quality also failed: $e2, trying LowQuality...');
-            // Final fallback to quality-based compression
-            mediaInfo = await VideoCompress.compressVideo(
-              videoFile.path,
-              quality: VideoQuality.LowQuality,
-              deleteOrigin: false,
-              includeAudio: true,
-            );
-            debugPrint('[COMPRESS] LowQuality compression completed');
-          }
-        }
+        final mediaInfo = await VideoCompress.compressVideo(
+          videoFile.path,
+          quality: VideoQuality.Res960x540Quality,
+          deleteOrigin: false,
+          includeAudio: true,
+        );
         
         debugPrint('[COMPRESS] VideoCompress.compressVideo completed');
         debugPrint('[COMPRESS] MediaInfo: ${mediaInfo?.path ?? "null"}');
@@ -255,37 +223,6 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
           final compressedFile = File(mediaInfo.path!);
           
           debugPrint('[COMPRESS] Compressed file path: ${compressedFile.path}');
-          debugPrint('[COMPRESS] Original file path: ${videoFile.path}');
-          debugPrint('[COMPRESS] Are paths the same? ${compressedFile.path == videoFile.path}');
-          
-          // Check if compression actually created a different file
-          if (compressedFile.path == videoFile.path) {
-            debugPrint('[COMPRESS] WARNING: Compressed file path is same as original - compression may not have occurred');
-            debugPrint('[COMPRESS] Trying DefaultQuality as last resort...');
-            try {
-              final fallbackInfo = await VideoCompress.compressVideo(
-                videoFile.path,
-                quality: VideoQuality.DefaultQuality,
-                deleteOrigin: false,
-                includeAudio: true,
-              );
-              if (fallbackInfo != null && fallbackInfo.path != null && fallbackInfo.path!.isNotEmpty) {
-                final fallbackFile = File(fallbackInfo.path!);
-                if (fallbackFile.path != videoFile.path) {
-                  debugPrint('[COMPRESS] Using DefaultQuality result');
-                  mediaInfo = fallbackInfo;
-                }
-              }
-            } catch (e) {
-              debugPrint('[COMPRESS] DefaultQuality also failed: $e');
-            }
-          }
-          
-          // Re-validate mediaInfo after potential fallback reassignment
-          if (mediaInfo == null || mediaInfo.path == null || mediaInfo.path!.isEmpty) {
-            debugPrint('[COMPRESS] MediaInfo is null or path is empty after fallback attempt');
-            return null;
-          }
           
           final finalFile = File(mediaInfo.path!);
           
@@ -302,14 +239,6 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
             debugPrint('[COMPRESS] Compressed video size: ${(compressedSize / 1024 / 1024).toStringAsFixed(2)}MB');
             debugPrint('[COMPRESS] Size reduction: ${((originalSize - compressedSize) / 1024 / 1024).toStringAsFixed(2)}MB (${((1 - compressedSize / originalSize) * 100).toStringAsFixed(1)}%)');
             
-            // Check if compression actually reduced size (at least 5% reduction)
-            if (compressedSize >= originalSize * 0.95) {
-              debugPrint('[COMPRESS] WARNING: Compression didn\'t reduce size significantly (less than 5% reduction)');
-              debugPrint('[COMPRESS] This may indicate video_compress is not working properly for this video format');
-              // Still return the file if it's under the limit
-            }
-            
-            // Check if compressed file is still too large
             if (compressedSize > maxSize) {
               debugPrint('[COMPRESS] Warning: Compressed video still exceeds size limit (${(compressedSize / 1024 / 1024).toStringAsFixed(2)}MB > ${(maxSize / 1024 / 1024).toStringAsFixed(2)}MB)');
               return null;
@@ -317,7 +246,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
             
             return finalFile;
           } else {
-            debugPrint('[COMPRESS] Compressed file does not exist at: ${mediaInfo?.path ?? "unknown"}');
+            debugPrint('[COMPRESS] Compressed file does not exist at: ${mediaInfo.path ?? "unknown"}');
           }
         } else {
           debugPrint('[COMPRESS] MediaInfo is null or path is empty');
@@ -398,7 +327,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
     try {
       // Check file size before processing
       final fileSize = await file.length();
-      const maxSize = 200 * 1024 * 1024; // 200MB - final upload limit
+      const maxSize = 200 * 720 * 720; // ~99MB (200×720×720) - final upload limit
       const rejectSize = 500 * 1024 * 1024; // 500MB - reject immediately if over this
       
       if (fileSize > rejectSize) {
@@ -476,7 +405,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    'Video compression failed. File size is ${(originalSize / 1024 / 1024).toStringAsFixed(1)}MB. Maximum size is 200MB after compression. Please try again or select a smaller video.',
+                    'Video compression failed. File size is ${(originalSize / 1024 / 1024).toStringAsFixed(1)}MB. Maximum size is ~99MB after compression. Please try again or select a smaller video.',
                   ),
                   backgroundColor: Colors.red,
                   duration: const Duration(seconds: 5),
@@ -487,12 +416,12 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
           }
         }
         
-        // Step 2: Check if compressed video is below 200MB
+        // Step 2: Check if compressed video is below limit (~99MB)
         final compressedSize = await fileToUpload.length();
         debugPrint('[VIDEO] Step 2: Checking compressed video size: ${(compressedSize / 1024 / 1024).toStringAsFixed(2)}MB');
         
         if (compressedSize > maxSize) {
-          debugPrint('[VIDEO] Compressed video exceeds 200MB limit');
+          debugPrint('[VIDEO] Compressed video exceeds size limit');
           if (mounted) {
             setState(() {
               _isUploading = false;
@@ -502,7 +431,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Video is still too large (${(compressedSize / 1024 / 1024).toStringAsFixed(1)}MB). Maximum size is 200MB after compression.',
+                  'Video is still too large (${(compressedSize / 1024 / 1024).toStringAsFixed(1)}MB). Maximum size is ~99MB after compression.',
                 ),
                 backgroundColor: Colors.red,
                 duration: const Duration(seconds: 5),
@@ -512,7 +441,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
           return;
         }
         
-        debugPrint('[VIDEO] Compressed video is under 200MB, proceeding to thumbnail generation...');
+        debugPrint('[VIDEO] Compressed video is under size limit, proceeding to thumbnail generation...');
         
         // Step 3: Generate thumbnail from compressed video (not original)
         setState(() {
@@ -567,7 +496,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
         if (e.toString().contains('File too large') || 
             e.toString().contains('too large') ||
             e.toString().contains('LIMIT_FILE_SIZE')) {
-          errorMessage = 'File is too large. Maximum size is 200MB after compression. Please select a smaller file or compress it before uploading.';
+          errorMessage = 'File is too large. Maximum size is ~99MB after compression. Please select a smaller file or compress it before uploading.';
         } else if (e.toString().contains('timeout')) {
           errorMessage = 'Upload timed out. Please check your internet connection and try again.';
         }
