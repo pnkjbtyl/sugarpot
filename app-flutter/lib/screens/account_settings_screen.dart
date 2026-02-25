@@ -26,6 +26,7 @@ class AccountSettingsScreen extends StatelessWidget {
               final isHidden = user?['isProfileHidden'] == true;
               
               return ListTile(
+                tileColor: Colors.white,
                 leading: Icon(
                   isHidden ? Icons.visibility_off : Icons.visibility,
                   color: context.appPrimaryColor,
@@ -48,6 +49,7 @@ class AccountSettingsScreen extends StatelessWidget {
           ),
           const Divider(height: 1),
           ListTile(
+            tileColor: Colors.white,
             leading: Icon(Icons.email, color: context.appPrimaryColor),
             title: const Text('Change Email'),
             subtitle: const Text('Update your email address'),
@@ -62,6 +64,7 @@ class AccountSettingsScreen extends StatelessWidget {
           ),
           const Divider(height: 1),
           ListTile(
+            tileColor: Colors.white,
             leading: const Icon(Icons.delete_forever, color: Colors.red),
             title: const Text(
               'Delete Profile',
@@ -75,6 +78,7 @@ class AccountSettingsScreen extends StatelessWidget {
           ),
           const Divider(height: 1),
           ListTile(
+            tileColor: Colors.white,
             leading: Icon(Icons.help, color: context.appPrimaryColor),
             title: const Text('Help'),
             subtitle: const Text('Contact support'),
@@ -102,6 +106,7 @@ class AccountSettingsScreen extends StatelessWidget {
               }
             },
           ),
+          const Divider(height: 1),
         ],
       ),
     );

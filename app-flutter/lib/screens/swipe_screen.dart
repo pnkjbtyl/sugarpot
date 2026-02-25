@@ -278,7 +278,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+            Icon(Icons.stream_sharp, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             const Text(
               'No more potential matches',

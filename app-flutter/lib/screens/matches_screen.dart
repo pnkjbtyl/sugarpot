@@ -121,8 +121,12 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
                 ? _lastMessagePreview(lastMessage['messageType'], lastMessage['messageText'])
                 : null;
 
-            return ListTile(
-              leading: Stack(
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  tileColor: Colors.white,
+                  leading: Stack(
                 clipBehavior: Clip.none,
                 children: [
                   CircleAvatar(
@@ -205,21 +209,24 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
                     ),
                 ],
               ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ChatScreen(
-                      matchId: match['matchId'],
-                      otherUser: user,
-                      location: location,
-                      onMessageSent: () => matchProvider.loadMyMatches(),
-                    ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          matchId: match['matchId'],
+                          otherUser: user,
+                          location: location,
+                          onMessageSent: () => matchProvider.loadMyMatches(),
+                        ),
                   ),
                 ).then((_) {
                   matchProvider.loadMyMatches();
                 });
-              },
+                  },
+                ),
+                const Divider(height: 1),
+              ],
             );
           },
           ),
@@ -359,10 +366,13 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
                 ? AppConfig.buildImageUrl(user['profileImage'])
                 : null;
 
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: context.appTertiaryColor,
-              child: ListTile(
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: Colors.white,
+                  child: ListTile(
                 leading: GestureDetector(
                   onTap: () {
                     Navigator.of(context).push(
@@ -489,7 +499,10 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
                     ),
                   );
                 },
-              ),
+                  ),
+                ),
+                const Divider(height: 1),
+              ],
             );
           },
         ),

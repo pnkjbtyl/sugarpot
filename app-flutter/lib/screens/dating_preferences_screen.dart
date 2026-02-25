@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../main.dart';
 import '../theme/app_colors.dart';
+import '../utils/error_message.dart';
 
 class DatingPreferencesScreen extends StatefulWidget {
   const DatingPreferencesScreen({super.key});
@@ -206,7 +207,7 @@ class _DatingPreferencesScreenState extends State<DatingPreferencesScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text(userFriendlyErrorMessage(e)),
             backgroundColor: Colors.red,
           ),
         );
@@ -447,6 +448,7 @@ class _DatingPreferencesScreenState extends State<DatingPreferencesScreen> {
                         ),
                 ),
               ),
+              const SizedBox(height: 48),
             ],
           ),
         ),
@@ -474,7 +476,7 @@ class _DatingPreferencesScreenState extends State<DatingPreferencesScreen> {
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(8),
-          color: isSelected ? context.appPrimaryColor.withOpacity(0.1) : Colors.white,
+          color: isSelected ? (Color.lerp(Colors.white, context.appPrimaryColor, 0.15) ?? Colors.white) : Colors.white,
         ),
         child: Row(
           children: [

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
+import '../utils/error_message.dart';
 
 class MatchProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -29,7 +30,7 @@ class MatchProvider with ChangeNotifier {
     try {
       _potentialMatches = await _apiService.getPotentialMatches();
     } catch (e) {
-      _error = e.toString();
+      _error = userFriendlyErrorMessage(e);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -44,7 +45,7 @@ class MatchProvider with ChangeNotifier {
       }
       return response;
     } catch (e) {
-      _error = e.toString();
+      _error = userFriendlyErrorMessage(e);
       notifyListeners();
       rethrow;
     }
@@ -57,7 +58,7 @@ class MatchProvider with ChangeNotifier {
       _potentialMatches.removeWhere((user) => user['id'] == targetUserId || user['_id'] == targetUserId);
       notifyListeners();
     } catch (e) {
-      _error = e.toString();
+      _error = userFriendlyErrorMessage(e);
       notifyListeners();
     }
   }
@@ -70,7 +71,7 @@ class MatchProvider with ChangeNotifier {
     try {
       _myMatches = await _apiService.getMyMatches();
     } catch (e) {
-      _error = e.toString();
+      _error = userFriendlyErrorMessage(e);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -82,7 +83,7 @@ class MatchProvider with ChangeNotifier {
       await _apiService.updateMatchLocation(matchId, locationId);
       await loadMyMatches();
     } catch (e) {
-      _error = e.toString();
+      _error = userFriendlyErrorMessage(e);
       notifyListeners();
     }
   }
@@ -103,7 +104,7 @@ class MatchProvider with ChangeNotifier {
       notifyListeners();
       return response;
     } catch (e) {
-      _error = e.toString();
+      _error = userFriendlyErrorMessage(e);
       notifyListeners();
       rethrow;
     }
@@ -153,7 +154,7 @@ class MatchProvider with ChangeNotifier {
     } catch (e, stackTrace) {
       debugPrint('[MATCH_PROVIDER] Error loading received hearts: $e');
       debugPrint('[MATCH_PROVIDER] Stack trace: $stackTrace');
-      _error = e.toString();
+      _error = userFriendlyErrorMessage(e);
     } finally {
       _isLoading = false;
       _isLoadingMoreReceivedHearts = false;
@@ -175,7 +176,7 @@ class MatchProvider with ChangeNotifier {
       _receivedHearts.removeWhere((request) => request['matchId'] == matchId);
       notifyListeners();
     } catch (e) {
-      _error = e.toString();
+      _error = userFriendlyErrorMessage(e);
       notifyListeners();
     }
   }

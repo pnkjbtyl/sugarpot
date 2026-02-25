@@ -11,6 +11,7 @@ import 'dart:io';
 import '../providers/auth_provider.dart';
 import '../utils/auth_errors.dart';
 import '../utils/config.dart';
+import '../utils/error_message.dart';
 import 'home_screen.dart';
 import '../theme/app_colors.dart';
 import 'get_started_screen.dart';
@@ -114,7 +115,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
+          SnackBar(content: Text(userFriendlyErrorMessage(e, fallback: 'Could not pick image. Please try again.'))),
         );
       }
     }
@@ -267,13 +268,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isCompleting = false);
-        final isTimeout = e.toString().contains('TimeoutException');
+        final isTimeout = e.toString().toLowerCase().contains('timeout');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               isTimeout
                   ? 'Location is taking too long. Try moving to a place with better signal, then tap Complete again.'
-                  : 'Error getting location: $e',
+                  : userFriendlyErrorMessage(e, fallback: 'Could not get location. Please try again.'),
             ),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 6),
@@ -595,7 +596,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(8),
-          color: isSelected ? context.appPrimaryColor.withOpacity(0.1) : Colors.white,
+          color: isSelected ? (Color.lerp(Colors.white, context.appPrimaryColor, 0.15) ?? Colors.white) : Colors.white,
         ),
         child: Row(
           children: [

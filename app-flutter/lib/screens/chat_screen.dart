@@ -19,6 +19,7 @@ import '../services/api_service.dart';
 import '../services/firebase_service.dart';
 import '../services/chat_media_cache.dart';
 import '../utils/config.dart';
+import '../utils/error_message.dart';
 import 'user_profile_details_screen.dart';
 import 'home_screen.dart';
 import '../theme/app_colors.dart';
@@ -215,7 +216,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to connect: $e'),
+            content: Text(userFriendlyErrorMessage(e, fallback: 'Failed to connect. Please try again.')),
             backgroundColor: Colors.red,
           ),
         );
@@ -291,7 +292,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error picking file: $e'),
+            content: Text(userFriendlyErrorMessage(e, fallback: 'Could not pick file. Please try again.')),
             backgroundColor: Colors.red,
           ),
         );
@@ -473,7 +474,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to upload file: $e'),
+            content: Text(userFriendlyErrorMessage(e, fallback: 'Failed to upload file. Please try again.')),
             backgroundColor: Colors.red,
           ),
         );
@@ -555,7 +556,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to unmatch user: $e'),
+            content: Text(userFriendlyErrorMessage(e, fallback: 'Failed to unmatch. Please try again.')),
             backgroundColor: Colors.red,
           ),
         );
@@ -640,7 +641,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to report user: $e'),
+            content: Text(userFriendlyErrorMessage(e, fallback: 'Failed to send report. Please try again.')),
             backgroundColor: Colors.red,
           ),
         );
@@ -700,7 +701,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to clear chat: $e'),
+            content: Text(userFriendlyErrorMessage(e, fallback: 'Failed to clear chat. Please try again.')),
             backgroundColor: Colors.red,
           ),
         );
@@ -1404,7 +1405,7 @@ class _FullscreenVideoDialogState extends State<_FullscreenVideoDialog> {
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not load video: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(userFriendlyErrorMessage(e, fallback: 'Could not load video.')), backgroundColor: Colors.red),
         );
       }
     }
@@ -1553,7 +1554,7 @@ class _AudioMessageWidgetState extends State<_AudioMessageWidget> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to load audio: $e'),
+            content: Text(userFriendlyErrorMessage(e, fallback: 'Failed to load audio.')),
             backgroundColor: Colors.red,
           ),
         );
@@ -1587,7 +1588,7 @@ class _AudioMessageWidgetState extends State<_AudioMessageWidget> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to play audio: $e'),
+            content: Text(userFriendlyErrorMessage(e, fallback: 'Failed to play audio.')),
             backgroundColor: Colors.red,
           ),
         );

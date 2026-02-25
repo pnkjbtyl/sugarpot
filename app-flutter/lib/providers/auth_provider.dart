@@ -1,9 +1,11 @@
 import 'dart:io';
-import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
+import '../services/current_user_cache.dart';
 import '../services/firebase_service.dart';
 import '../utils/auth_errors.dart';
+import '../utils/error_message.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -58,7 +60,7 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return response['message'] != null;
     } catch (e) {
-      _error = e.toString();
+      _error = userFriendlyErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -76,10 +78,10 @@ class AuthProvider with ChangeNotifier {
 
       if (response['user'] != null) {
         _user = response['user'];
-        
+        final token = await _apiService.getToken();
+        await CurrentUserCache.saveUser(_user!, authToken: token);
         // Request notification permission and update Firebase token
         await _updateFirebaseToken();
-        
         _isLoading = false;
         notifyListeners();
         return true;
@@ -90,7 +92,7 @@ class AuthProvider with ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _error = e.toString();
+      _error = userFriendlyErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -176,6 +178,8 @@ class AuthProvider with ChangeNotifier {
 
       if (response['_id'] != null) {
         _user = response;
+        final token = await _apiService.getToken();
+        await CurrentUserCache.saveUser(_user!, authToken: token);
         _isLoading = false;
         notifyListeners();
         return true;
@@ -186,6 +190,7 @@ class AuthProvider with ChangeNotifier {
           // Clear token and user data
           await _apiService.clearToken();
           _user = null;
+          await CurrentUserCache.clear();
         } else {
           _error = response['message'] ?? 'Failed to complete onboarding';
         }
@@ -194,16 +199,27 @@ class AuthProvider with ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _error = e.toString();
+      _error = userFriendlyErrorMessage(e);
       // If authentication failed, clear token and user
       if (AuthErrorCodes.requiresReLogin(e)) {
         await _apiService.clearToken();
         _user = null;
+        await CurrentUserCache.clear();
         _error = 'Your session has expired. Please log in again.';
       }
       _isLoading = false;
       notifyListeners();
       return false;
+    }
+  }
+
+  /// Hydrate _user from local cache (e.g. before opening chat from notification).
+  /// Does not set _isLoading. Call loadUser() in background to verify token and refresh from API.
+  Future<void> hydrateFromCache() async {
+    final cached = await CurrentUserCache.getCachedUser();
+    if (cached != null && cached.isNotEmpty) {
+      _user = cached;
+      notifyListeners();
     }
   }
 
@@ -215,6 +231,7 @@ class AuthProvider with ChangeNotifier {
       final token = await _apiService.getToken();
       if (token == null) {
         _user = null;
+        await CurrentUserCache.clear();
         _isLoading = false;
         notifyListeners();
         return;
@@ -223,12 +240,17 @@ class AuthProvider with ChangeNotifier {
       final user = await _apiService.getProfile();
       _user = user;
       _error = null;
+      if (user.isNotEmpty) {
+        final token = await _apiService.getToken();
+        await CurrentUserCache.saveUser(user, authToken: token);
+      }
     } catch (e) {
-      _error = e.toString();
+      _error = userFriendlyErrorMessage(e);
       _user = null;
       // If authentication failed, clear token
       if (AuthErrorCodes.requiresReLogin(e)) {
         await _apiService.clearToken();
+        await CurrentUserCache.clear();
       }
     } finally {
       _isLoading = false;
@@ -247,6 +269,8 @@ class AuthProvider with ChangeNotifier {
 
       if (response['_id'] != null) {
         _user = response;
+        final token = await _apiService.getToken();
+        await CurrentUserCache.saveUser(_user!, authToken: token);
         _isLoading = false;
         notifyListeners();
         return true;
@@ -256,6 +280,7 @@ class AuthProvider with ChangeNotifier {
           _error = 'Your session has expired. Please log in again.';
           await _apiService.clearToken();
           _user = null;
+          await CurrentUserCache.clear();
         } else {
           _error = response['message'] ?? 'Failed to update profile';
         }
@@ -264,7 +289,7 @@ class AuthProvider with ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _error = e.toString();
+      _error = userFriendlyErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -285,6 +310,7 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> logout() async {
     await _apiService.clearToken();
+    await CurrentUserCache.clear();
     _user = null;
     _error = null;
     notifyListeners();

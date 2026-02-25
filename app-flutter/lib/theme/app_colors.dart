@@ -34,7 +34,7 @@ class AppColors extends ThemeExtension<AppColors> {
   static const AppColors maleScheme = AppColors(
     primary: Color.fromARGB(255, 71, 138, 224),
     secondary: Color.fromARGB(255, 204, 227, 255),
-    tertiary: Color(0xFFebf4ff),
+    tertiary: Color.fromARGB(255, 224, 236, 250),
   );
 
   /// Female - pink shades

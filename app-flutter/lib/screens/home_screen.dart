@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/current_user_cache.dart';
 import '../services/firebase_service.dart';
 import '../utils/config.dart';
 import 'swipe_screen.dart' show SwipeScreen, swipeScreenKey;
@@ -17,6 +18,8 @@ import 'photos_media_screen.dart';
 import 'dating_preferences_screen.dart';
 import 'account_settings_screen.dart';
 import '../theme/app_colors.dart';
+import '../utils/error_message.dart';
+import '../widgets/connectivity_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   final int? initialIndex;
@@ -99,11 +102,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       clipBehavior: Clip.none,
                       children: [
                         if (user?['profileImage'] != null)
-                            CircleAvatar(
-                            radius: 60,
-                            backgroundImage: NetworkImage(
-                              AppConfig.getProfileThumbnailUrl(user!['profileImage']),
-                            ),
+                          FutureBuilder<String?>(
+                            future: CurrentUserCache.getCachedProfileImagePath(),
+                            builder: (context, snapshot) {
+                              final cachedPath = snapshot.data;
+                              return CircleAvatar(
+                                radius: 60,
+                                backgroundImage: cachedPath != null
+                                    ? FileImage(File(cachedPath))
+                                    : NetworkImage(
+                                        AppConfig.getProfileThumbnailUrl(user!['profileImage']),
+                                      ) as ImageProvider,
+                              );
+                            },
                           )
                         else
                           const CircleAvatar(
@@ -336,7 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Navigator.of(context).pop(); // Close loading dialog
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error: ${e.toString()}'),
+              content: Text(userFriendlyErrorMessage(e)),
               backgroundColor: Colors.red,
             ),
           );
@@ -347,7 +358,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error picking image: $e'),
+            content: Text(userFriendlyErrorMessage(e, fallback: 'Could not pick image. Please try again.')),
             backgroundColor: Colors.red,
           ),
         );
@@ -445,12 +456,19 @@ class _HomeScreenState extends State<HomeScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
         automaticallyImplyLeading: false,
       ),
-      body: IndexedStack(
-        index: _currentIndex,
+      body: Column(
         children: [
-          _buildProfileScreen(),
-          SwipeScreen(key: swipeScreenKey),
-          MatchesScreen(initialTabIndex: widget.initialMatchesTabIndex),
+          const ConnectivityBar(onlyWhenOffline: true),
+          Expanded(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: [
+                _buildProfileScreen(),
+                SwipeScreen(key: swipeScreenKey),
+                MatchesScreen(initialTabIndex: widget.initialMatchesTabIndex),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(

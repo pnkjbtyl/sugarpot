@@ -12,6 +12,7 @@ import '../providers/auth_provider.dart';
 import '../main.dart';
 import '../theme/app_colors.dart';
 import '../utils/config.dart';
+import '../utils/error_message.dart';
 
 class PhotosMediaScreen extends StatefulWidget {
   const PhotosMediaScreen({super.key});
@@ -67,7 +68,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading gallery: $e'),
+            content: Text(userFriendlyErrorMessage(e, fallback: 'Could not load gallery. Please try again.')),
             backgroundColor: Colors.red,
           ),
         );
@@ -490,17 +491,14 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
       }
     } catch (e) {
       if (mounted) {
-        String errorMessage = 'Error uploading media: $e';
-        
-        // Provide user-friendly error messages
+        String errorMessage;
         if (e.toString().contains('File too large') || 
             e.toString().contains('too large') ||
             e.toString().contains('LIMIT_FILE_SIZE')) {
           errorMessage = 'File is too large. Maximum size is ~99MB after compression. Please select a smaller file or compress it before uploading.';
-        } else if (e.toString().contains('timeout')) {
-          errorMessage = 'Upload timed out. Please check your internet connection and try again.';
+        } else {
+          errorMessage = userFriendlyErrorMessage(e, fallback: 'Upload failed. Please check your connection and try again.');
         }
-        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
@@ -557,7 +555,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error deleting media: $e'),
+            content: Text(userFriendlyErrorMessage(e, fallback: 'Could not delete media. Please try again.')),
             backgroundColor: Colors.red,
           ),
         );

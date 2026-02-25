@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'dart:convert';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -11,7 +9,6 @@ import 'package:provider/provider.dart';
 
 import '../app_navigator.dart';
 import '../providers/auth_provider.dart';
-import '../providers/match_provider.dart';
 import '../screens/chat_screen.dart';
 
 class FirebaseService {
@@ -89,12 +86,12 @@ class FirebaseService {
           if (type == 'heart_request') {
             _ensureUserLoadedThen(() async => _openReceivedHearts());
           } else if (type == 'heart_accepted') {
-            _ensureUserLoadedThen(() => _openChatFromHeartAcceptedPayload(response.payload!));
+            _openChatFromHeartAcceptedPayload(response.payload!);
           } else {
-            _ensureUserLoadedThen(() => _openChatFromPayload(response.payload!));
+            _openChatFromPayload(response.payload!);
           }
         } catch (_) {
-          _ensureUserLoadedThen(() => _openChatFromPayload(response.payload!));
+          _openChatFromPayload(response.payload!);
         }
       },
     );
@@ -119,34 +116,18 @@ class FirebaseService {
       final nav = navigatorKey.currentState;
       if (nav == null || !nav.mounted) return;
 
-      // 1. Same chat already open: just refresh and return
+      // Same chat already open: just refresh and return
       if (tryRefreshChatIfSame(matchId)) return;
 
-      // 2. Already on Matches screen: skip navigate and fetch, just push chat
-      if (isOnMatchesScreen) {
-        nav.push(
-          MaterialPageRoute(
-            builder: (_) => ChatScreen(
-              matchId: matchId,
-              otherUser: {'id': senderId, 'name': senderName ?? 'Unknown'},
-            ),
-          ),
-        );
-        return;
+      // Hydrate auth from cache so theme and currentUserId are available
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        await authProvider.hydrateFromCache();
+        if (!context.mounted) return;
       }
 
-      // 3. Land on Matches tab first, fetch matches, then open chat
-      nav.pushNamedAndRemoveUntil('/home', (route) => false, arguments: 2);
-
-      final frameDone = Completer<void>();
-      WidgetsBinding.instance.addPostFrameCallback((_) => frameDone.complete());
-      await frameDone.future;
-
-      final context = navigatorKey.currentContext;
-      if (context == null || !context.mounted) return;
-      await Provider.of<MatchProvider>(context, listen: false).loadMyMatches();
-      if (!context.mounted) return;
-
+      // Land directly on chat screen; auth check runs in background
       nav.push(
         MaterialPageRoute(
           builder: (_) => ChatScreen(
@@ -155,6 +136,12 @@ class FirebaseService {
           ),
         ),
       );
+
+      // Verify token and refresh user from API in background (no await)
+      final ctx = navigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        Provider.of<AuthProvider>(ctx, listen: false).loadUser();
+      }
     } catch (e) {
       debugPrint('Error opening chat from notification: $e');
     }
@@ -185,28 +172,12 @@ class FirebaseService {
 
       if (tryRefreshChatIfSame(matchId)) return;
 
-      if (isOnMatchesScreen) {
-        nav.push(
-          MaterialPageRoute(
-            builder: (_) => ChatScreen(
-              matchId: matchId,
-              otherUser: {'id': accepterId, 'name': accepterName ?? 'Unknown'},
-            ),
-          ),
-        );
-        return;
-      }
-
-      nav.pushNamedAndRemoveUntil('/home', (route) => false, arguments: 2);
-
-      final frameDone = Completer<void>();
-      WidgetsBinding.instance.addPostFrameCallback((_) => frameDone.complete());
-      await frameDone.future;
-
       final context = navigatorKey.currentContext;
-      if (context == null || !context.mounted) return;
-      await Provider.of<MatchProvider>(context, listen: false).loadMyMatches();
-      if (!context.mounted) return;
+      if (context != null) {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        await authProvider.hydrateFromCache();
+        if (!context.mounted) return;
+      }
 
       nav.push(
         MaterialPageRoute(
@@ -216,6 +187,11 @@ class FirebaseService {
           ),
         ),
       );
+
+      final ctx = navigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        Provider.of<AuthProvider>(ctx, listen: false).loadUser();
+      }
     } catch (e) {
       debugPrint('Error opening chat from heart_accepted notification: $e');
     }
@@ -325,7 +301,7 @@ class FirebaseService {
           'senderName': data['senderName'],
         });
         WidgetsBinding.instance.addPostFrameCallback((_) async {
-          await _ensureUserLoadedThen(() => _openChatFromPayload(payload));
+          await _openChatFromPayload(payload);
         });
       } else if (type == 'heart_request') {
         WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -333,7 +309,7 @@ class FirebaseService {
         });
       } else if (type == 'heart_accepted') {
         WidgetsBinding.instance.addPostFrameCallback((_) async {
-          await _ensureUserLoadedThen(() => _openChatFromHeartAcceptedPayload(jsonEncode(message.data)));
+          await _openChatFromHeartAcceptedPayload(jsonEncode(message.data));
         });
       }
     });
@@ -341,11 +317,11 @@ class FirebaseService {
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       final type = message.data['type'] as String?;
       if (type == 'chat') {
-        _ensureUserLoadedThen(() => _openChatFromPayload(jsonEncode(message.data)));
+        _openChatFromPayload(jsonEncode(message.data));
       } else if (type == 'heart_request') {
         _ensureUserLoadedThen(() async => _openReceivedHearts());
       } else if (type == 'heart_accepted') {
-        _ensureUserLoadedThen(() => _openChatFromHeartAcceptedPayload(jsonEncode(message.data)));
+        _openChatFromHeartAcceptedPayload(jsonEncode(message.data));
       }
     });
   }

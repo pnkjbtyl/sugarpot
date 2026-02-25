@@ -13,6 +13,7 @@ import 'providers/match_provider.dart';
 import 'providers/location_provider.dart';
 import 'services/firebase_service.dart';
 import 'theme/app_colors.dart';
+import 'widgets/heart_pattern_background.dart';
 
 // Default color constants (used when theme extension is not available, e.g. fallback)
 const Color primaryColor = Color(0xFFab76e3);
@@ -50,6 +51,7 @@ class MyApp extends StatelessWidget {
     return ThemeData(
       primaryColor: colors.primary,
       extensions: [colors],
+      scaffoldBackgroundColor: Colors.transparent,
       colorScheme: ColorScheme.fromSeed(
         seedColor: colors.primary,
         primary: colors.primary,
@@ -63,6 +65,18 @@ class MyApp extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: colors.primary,
           foregroundColor: Colors.white,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+      ),
+      listTileTheme: const ListTileThemeData(
+        tileColor: Colors.white,
+      ),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        menuStyle: MenuStyle(
+          backgroundColor: WidgetStateProperty.all(Colors.white),
         ),
       ),
       useMaterial3: true,
@@ -84,6 +98,15 @@ class MyApp extends StatelessWidget {
             navigatorKey: navigatorKey,
             title: 'SugarPot',
             theme: _buildTheme(colors),
+            builder: (context, child) {
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  const HeartPatternBackground(),
+                  if (child != null) child,
+                ],
+              );
+            },
             home: const SplashScreen(),
             routes: {
               '/get-started': (context) => const GetStartedScreen(),
