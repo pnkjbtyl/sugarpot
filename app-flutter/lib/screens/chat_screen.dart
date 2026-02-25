@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math' as math;
@@ -20,6 +21,7 @@ import '../services/firebase_service.dart';
 import '../services/chat_media_cache.dart';
 import '../utils/config.dart';
 import '../utils/error_message.dart';
+import '../widgets/app_error_bar.dart';
 import 'user_profile_details_screen.dart';
 import 'home_screen.dart';
 import '../theme/app_colors.dart';
@@ -54,6 +56,8 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _currentUserId;
   DateTime? _clearedAt; // Timestamp when chat was cleared
   late Map<String, dynamic> _displayUser;
+  /// True when socket failed to connect or we never received message history.
+  bool _connectionFailed = false;
 
   @override
   void initState() {
@@ -117,7 +121,16 @@ class _ChatScreenState extends State<ChatScreen> {
       _currentUserId = authProvider.user?['id'] ?? authProvider.user?['_id'] ?? '';
       
       _socket = await SocketService.getSocket();
-      
+
+      // When socket disconnects after we've loaded, show Retry so user can reconnect (Send won't work until then)
+      _socket!.onDisconnect((_) {
+        if (mounted) {
+          setState(() {
+            _connectionFailed = true;
+          });
+        }
+      });
+
       // Listen for new messages
       _socket!.on('new_message', (data) {
         // Always show new messages, even if chat was cleared
@@ -174,6 +187,7 @@ class _ChatScreenState extends State<ChatScreen> {
           } else {
             _messages = allMessages;
           }
+          _connectionFailed = false;
           _isLoading = false;
         });
         _scrollToBottom();
@@ -211,15 +225,12 @@ class _ChatScreenState extends State<ChatScreen> {
       });
     } catch (e) {
       setState(() {
+        _socket = null;
+        _connectionFailed = true;
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(userFriendlyErrorMessage(e, fallback: 'Failed to connect. Please try again.')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e, fallback: 'Failed to connect. Please try again.'));
       }
     }
   }
@@ -290,12 +301,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(userFriendlyErrorMessage(e, fallback: 'Could not pick file. Please try again.')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e, fallback: 'Could not pick file. Please try again.'));
       }
     }
   }
@@ -472,12 +478,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(userFriendlyErrorMessage(e, fallback: 'Failed to upload file. Please try again.')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e, fallback: 'Failed to upload file. Please try again.'));
       }
     } finally {
       if (mounted) {
@@ -554,12 +555,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(userFriendlyErrorMessage(e, fallback: 'Failed to unmatch. Please try again.')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e, fallback: 'Failed to unmatch. Please try again.'));
       }
     }
   }
@@ -639,12 +635,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(userFriendlyErrorMessage(e, fallback: 'Failed to send report. Please try again.')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e, fallback: 'Failed to send report. Please try again.'));
       }
     }
   }
@@ -699,12 +690,7 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       debugPrint('Error clearing chat: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(userFriendlyErrorMessage(e, fallback: 'Failed to clear chat. Please try again.')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e, fallback: 'Failed to clear chat. Please try again.'));
       }
     }
   }
@@ -721,6 +707,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _socket?.off('message_delivered');
     _socket?.off('messages_history');
     _socket?.off('error');
+    _socket?.off('disconnect');
     super.dispose();
   }
 
@@ -991,14 +978,28 @@ class _ChatScreenState extends State<ChatScreen> {
     return const SizedBox(width: 16);
   }
 
+  /// Navigate back to Matches tab (Home with tab index 2), regardless of how user opened chat.
+  void _goBackToMatches() {
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      '/home',
+      (route) => false,
+      arguments: 2,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _goBackToMatches();
+      },
+      child: Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _goBackToMatches,
         ),
         titleSpacing: 0,
         title: GestureDetector(
@@ -1147,16 +1148,53 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _messages.isEmpty && _clearedAt != null
-                    ? const Center(
-                        child: Text('Chat cleared'),
-                      )
-                    : _messages.isEmpty
-                        ? const Center(
-                            child: Text('No messages yet. Start the conversation!'),
-                          )
-                        : ListView.builder(
+                      ? const Center(child: CircularProgressIndicator())
+                      : _messages.isEmpty && _clearedAt != null
+                          ? const Center(
+                              child: Text('Chat cleared'),
+                            )
+                          : _messages.isEmpty && _connectionFailed
+                              ? Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'Connection failed. Check your network and try again.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.grey[700],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 24),
+                                        ElevatedButton.icon(
+                                          onPressed: () async {
+                                            setState(() {
+                                              _connectionFailed = false;
+                                              _isLoading = true;
+                                            });
+                                            SocketService.disconnect();
+                                            await _initializeSocket();
+                                          },
+                                          icon: const Icon(Icons.refresh),
+                                          label: const Text('Retry'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: context.appPrimaryColor,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              : _messages.isEmpty
+                                  ? const Center(
+                                      child: Text('No messages yet. Start the conversation!'),
+                                    )
+                                  : ListView.builder(
                         reverse: true,
                         controller: _scrollController,
                         itemCount: _messages.length,
@@ -1247,7 +1285,9 @@ class _ChatScreenState extends State<ChatScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : Icon(Icons.attach_file, color: context.appPrimaryColor),
-                    onPressed: _isUploading ? null : _pickAndUploadFile,
+                    onPressed: (_isUploading || _connectionFailed || _socket == null || !_socket!.connected)
+                        ? null
+                        : _pickAndUploadFile,
                   ),
                   Expanded(
                     child: TextField(
@@ -1265,8 +1305,15 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: Icon(Icons.send, color: context.appPrimaryColor),
-                    onPressed: _sendMessage,
+                    icon: Icon(
+                      Icons.send,
+                      color: (_connectionFailed || _socket == null || !_socket!.connected)
+                          ? Colors.grey
+                          : context.appPrimaryColor,
+                    ),
+                    onPressed: (_connectionFailed || _socket == null || !_socket!.connected)
+                        ? null
+                        : _sendMessage,
                   ),
                 ],
               ),
@@ -1274,6 +1321,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 }
@@ -1404,9 +1452,7 @@ class _FullscreenVideoDialogState extends State<_FullscreenVideoDialog> {
       debugPrint('Fullscreen video init error: $e');
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userFriendlyErrorMessage(e, fallback: 'Could not load video.')), backgroundColor: Colors.red),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e, fallback: 'Could not load video.'));
       }
     }
   }
@@ -1552,12 +1598,7 @@ class _AudioMessageWidgetState extends State<_AudioMessageWidget> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(userFriendlyErrorMessage(e, fallback: 'Failed to load audio.')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e, fallback: 'Failed to load audio.'));
       }
     }
   }
@@ -1586,12 +1627,7 @@ class _AudioMessageWidgetState extends State<_AudioMessageWidget> {
     } catch (e) {
       debugPrint('Error toggling playback: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(userFriendlyErrorMessage(e, fallback: 'Failed to play audio.')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e, fallback: 'Failed to play audio.'));
       }
     }
   }

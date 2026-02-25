@@ -31,34 +31,56 @@ class SocketService {
         .setTransports(['websocket'])
         .setAuth({'token': token})
         .setExtraHeaders({'authorization': 'Bearer $token'})
-        .enableAutoConnect()
+        .disableAutoConnect()
+        .disableReconnection()
         .build(),
     );
 
     final completer = Completer<void>();
-    _socket!.onConnect((_) {
+    final thisSocket = _socket!;
+    bool errorHandled = false;
+    thisSocket.onConnect((_) {
       if (!completer.isCompleted) completer.complete();
     });
-    _socket!.onDisconnect((_) {
-      print('Socket disconnected');
+    thisSocket.onDisconnect((_) {
+      // Only clear if this is still the active socket (avoids old socket's callback killing a new one after Retry)
+      if (_socket == thisSocket) {
+        _socket?.disconnect();
+        _socket = null;
+      }
     });
-    _socket!.onError((error) {
-      print('Socket error: $error');
+    thisSocket.onError((error) {
+      // Socket.io can fire onError repeatedly when disconnected (e.g. every few seconds); handle only once and stop the socket
+      if (errorHandled) return;
+      errorHandled = true;
+      // Disconnect immediately so the library stops any internal retries and stops emitting further errors
+      try {
+        thisSocket.disconnect();
+      } catch (_) {}
+      if (_socket == thisSocket) {
+        _socket = null;
+      }
       if (!completer.isCompleted) completer.completeError(error);
     });
+
+    thisSocket.connect();
 
     try {
       await completer.future.timeout(
         const Duration(seconds: 15),
         onTimeout: () {
-          _socket?.disconnect();
-          _socket = null;
+          if (_socket == thisSocket) {
+            _socket?.disconnect();
+            _socket = null;
+          }
           throw TimeoutException('Socket connection timed out');
         },
       );
     } catch (e) {
-      _socket?.disconnect();
-      _socket = null;
+      if (_socket == thisSocket) {
+        _socket?.disconnect();
+        _socket = null;
+      }
       rethrow;
     }
     return _socket!;

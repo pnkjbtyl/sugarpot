@@ -13,19 +13,14 @@ import 'providers/match_provider.dart';
 import 'providers/location_provider.dart';
 import 'services/firebase_service.dart';
 import 'theme/app_colors.dart';
+import 'widgets/app_error_bar.dart';
 import 'widgets/heart_pattern_background.dart';
+import 'firebase_background_handler.dart';
 
 // Default color constants (used when theme extension is not available, e.g. fallback)
 const Color primaryColor = Color(0xFFab76e3);
 const Color secondaryColor = Color.fromARGB(255, 238, 222, 255);
 const Color tertiaryColor = Color.fromARGB(255, 245, 236, 255);
-
-// Background message handler (must be top-level function)
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  await FirebaseService.backgroundMessageHandler(message);
-}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,7 +30,7 @@ void main() async {
   
   await Firebase.initializeApp();
   
-  // Setup Firebase Messaging
+  // Background handler in separate file so that isolate never loads socket_io_client
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   await FirebaseService.init();
   FirebaseService.setupForegroundHandler();
@@ -101,9 +96,11 @@ class MyApp extends StatelessWidget {
             builder: (context, child) {
               return Stack(
                 fit: StackFit.expand,
+                clipBehavior: Clip.none,
                 children: [
                   const HeartPatternBackground(),
                   if (child != null) child,
+                  const AppErrorBar(),
                 ],
               );
             },

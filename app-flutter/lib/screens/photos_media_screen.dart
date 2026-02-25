@@ -13,6 +13,7 @@ import '../main.dart';
 import '../theme/app_colors.dart';
 import '../utils/config.dart';
 import '../utils/error_message.dart';
+import '../widgets/app_error_bar.dart';
 
 class PhotosMediaScreen extends StatefulWidget {
   const PhotosMediaScreen({super.key});
@@ -66,12 +67,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(userFriendlyErrorMessage(e, fallback: 'Could not load gallery. Please try again.')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e, fallback: 'Could not load gallery. Please try again.'));
       }
     }
   }
@@ -499,13 +495,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
         } else {
           errorMessage = userFriendlyErrorMessage(e, fallback: 'Upload failed. Please check your connection and try again.');
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        AppErrorBar.show(errorMessage);
       }
     } finally {
       if (mounted) {
@@ -553,12 +543,7 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(userFriendlyErrorMessage(e, fallback: 'Could not delete media. Please try again.')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e, fallback: 'Could not delete media. Please try again.'));
       }
     }
   }

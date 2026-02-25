@@ -6,6 +6,7 @@ import '../services/current_user_cache.dart';
 import '../services/firebase_service.dart';
 import '../utils/auth_errors.dart';
 import '../utils/error_message.dart';
+import '../widgets/app_error_bar.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -61,6 +62,7 @@ class AuthProvider with ChangeNotifier {
       return response['message'] != null;
     } catch (e) {
       _error = userFriendlyErrorMessage(e);
+      AppErrorBar.show(_error!);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -93,6 +95,7 @@ class AuthProvider with ChangeNotifier {
       }
     } catch (e) {
       _error = userFriendlyErrorMessage(e);
+      AppErrorBar.show(_error!);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -200,6 +203,7 @@ class AuthProvider with ChangeNotifier {
       }
     } catch (e) {
       _error = userFriendlyErrorMessage(e);
+      AppErrorBar.show(_error!);
       // If authentication failed, clear token and user
       if (AuthErrorCodes.requiresReLogin(e)) {
         await _apiService.clearToken();
@@ -246,6 +250,7 @@ class AuthProvider with ChangeNotifier {
       }
     } catch (e) {
       _error = userFriendlyErrorMessage(e);
+      AppErrorBar.show(_error!);
       _user = null;
       // If authentication failed, clear token
       if (AuthErrorCodes.requiresReLogin(e)) {
@@ -290,6 +295,7 @@ class AuthProvider with ChangeNotifier {
       }
     } catch (e) {
       _error = userFriendlyErrorMessage(e);
+      AppErrorBar.show(_error!);
       _isLoading = false;
       notifyListeners();
       return false;

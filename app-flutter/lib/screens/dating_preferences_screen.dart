@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../main.dart';
 import '../theme/app_colors.dart';
 import '../utils/error_message.dart';
+import '../widgets/app_error_bar.dart';
 
 class DatingPreferencesScreen extends StatefulWidget {
   const DatingPreferencesScreen({super.key});
@@ -195,22 +196,12 @@ class _DatingPreferencesScreenState extends State<DatingPreferencesScreen> {
           );
           Navigator.of(context).pop();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(authProvider.error ?? 'Failed to update preferences'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppErrorBar.show(authProvider.error ?? 'Failed to update preferences');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(userFriendlyErrorMessage(e)),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e));
       }
     } finally {
       if (mounted) {

@@ -12,6 +12,7 @@ import '../providers/auth_provider.dart';
 import '../utils/auth_errors.dart';
 import '../utils/config.dart';
 import '../utils/error_message.dart';
+import '../widgets/app_error_bar.dart';
 import 'home_screen.dart';
 import '../theme/app_colors.dart';
 import 'get_started_screen.dart';
@@ -114,9 +115,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userFriendlyErrorMessage(e, fallback: 'Could not pick image. Please try again.'))),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e, fallback: 'Could not pick image. Please try again.'));
       }
     }
   }
@@ -269,16 +268,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (mounted) {
         setState(() => _isCompleting = false);
         final isTimeout = e.toString().toLowerCase().contains('timeout');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isTimeout
-                  ? 'Location is taking too long. Try moving to a place with better signal, then tap Complete again.'
-                  : userFriendlyErrorMessage(e, fallback: 'Could not get location. Please try again.'),
-            ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 6),
-          ),
+        AppErrorBar.show(
+          isTimeout
+              ? 'Location is taking too long. Try moving to a place with better signal, then tap Complete again.'
+              : userFriendlyErrorMessage(e, fallback: 'Could not get location. Please try again.'),
         );
       }
       return;
@@ -333,13 +326,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         );
       } else {
         final error = authProvider.error ?? 'Failed to complete onboarding';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        AppErrorBar.show(error);
         
         // If authentication failed, redirect to login
         // Check error code from auth provider

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../services/api_service.dart';
 import '../utils/error_message.dart';
+import '../widgets/app_error_bar.dart';
 
 class MatchProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -31,6 +32,7 @@ class MatchProvider with ChangeNotifier {
       _potentialMatches = await _apiService.getPotentialMatches();
     } catch (e) {
       _error = userFriendlyErrorMessage(e);
+      AppErrorBar.show(_error!);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -46,6 +48,7 @@ class MatchProvider with ChangeNotifier {
       return response;
     } catch (e) {
       _error = userFriendlyErrorMessage(e);
+      AppErrorBar.show(_error!);
       notifyListeners();
       rethrow;
     }
@@ -59,6 +62,7 @@ class MatchProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _error = userFriendlyErrorMessage(e);
+      AppErrorBar.show(_error!);
       notifyListeners();
     }
   }
@@ -72,6 +76,7 @@ class MatchProvider with ChangeNotifier {
       _myMatches = await _apiService.getMyMatches();
     } catch (e) {
       _error = userFriendlyErrorMessage(e);
+      AppErrorBar.show(_error!);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -84,6 +89,7 @@ class MatchProvider with ChangeNotifier {
       await loadMyMatches();
     } catch (e) {
       _error = userFriendlyErrorMessage(e);
+      AppErrorBar.show(_error!);
       notifyListeners();
     }
   }
@@ -105,6 +111,7 @@ class MatchProvider with ChangeNotifier {
       return response;
     } catch (e) {
       _error = userFriendlyErrorMessage(e);
+      AppErrorBar.show(_error!);
       notifyListeners();
       rethrow;
     }
@@ -155,6 +162,7 @@ class MatchProvider with ChangeNotifier {
       debugPrint('[MATCH_PROVIDER] Error loading received hearts: $e');
       debugPrint('[MATCH_PROVIDER] Stack trace: $stackTrace');
       _error = userFriendlyErrorMessage(e);
+      AppErrorBar.show(_error!);
     } finally {
       _isLoading = false;
       _isLoadingMoreReceivedHearts = false;
@@ -177,6 +185,7 @@ class MatchProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _error = userFriendlyErrorMessage(e);
+      AppErrorBar.show(_error!);
       notifyListeners();
     }
   }

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 
+import 'bar_text_style.dart';
+
 /// Red bar with white text shown below the app bar when there's no connectivity.
 /// With [onlyWhenOffline] true, shows only when offline (no slow-network check).
 class ConnectivityBar extends StatefulWidget {
@@ -57,11 +59,7 @@ class _ConnectivityBarState extends State<ConnectivityBar> {
           child: Center(
             child: Text(
               'No Internet',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
+              style: barMessageTextStyle,
             ),
           ),
         ),

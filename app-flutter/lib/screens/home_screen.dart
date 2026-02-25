@@ -19,6 +19,7 @@ import 'dating_preferences_screen.dart';
 import 'account_settings_screen.dart';
 import '../theme/app_colors.dart';
 import '../utils/error_message.dart';
+import '../widgets/app_error_bar.dart';
 import '../widgets/connectivity_bar.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -345,23 +346,13 @@ class _HomeScreenState extends State<HomeScreen> {
         debugPrint('Error uploading profile image: $e');
         if (mounted) {
           Navigator.of(context).pop(); // Close loading dialog
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(userFriendlyErrorMessage(e)),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppErrorBar.show(userFriendlyErrorMessage(e));
         }
       }
     } catch (e) {
       debugPrint('Error picking image: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(userFriendlyErrorMessage(e, fallback: 'Could not pick image. Please try again.')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e, fallback: 'Could not pick image. Please try again.'));
       }
     }
   }

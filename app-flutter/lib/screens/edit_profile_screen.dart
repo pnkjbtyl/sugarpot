@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../main.dart';
 import '../theme/app_colors.dart';
 import '../utils/error_message.dart';
+import '../widgets/app_error_bar.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -145,22 +146,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           );
           Navigator.of(context).pop();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(authProvider.error ?? 'Failed to update profile'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppErrorBar.show(authProvider.error ?? 'Failed to update profile');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(userFriendlyErrorMessage(e)),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppErrorBar.show(userFriendlyErrorMessage(e));
       }
     } finally {
       if (mounted) {
