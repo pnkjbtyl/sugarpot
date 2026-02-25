@@ -47,7 +47,7 @@ class AccountSettingsScreen extends StatelessWidget {
               );
             },
           ),
-          const Divider(height: 1),
+          const Divider(height: 1, color: Color(0xFFE0E0E0)),
           ListTile(
             tileColor: Colors.white,
             leading: Icon(Icons.email, color: context.appPrimaryColor),
@@ -62,7 +62,7 @@ class AccountSettingsScreen extends StatelessWidget {
               );
             },
           ),
-          const Divider(height: 1),
+          const Divider(height: 1, color: Color(0xFFE0E0E0)),
           ListTile(
             tileColor: Colors.white,
             leading: const Icon(Icons.delete_forever, color: Colors.red),
@@ -76,7 +76,7 @@ class AccountSettingsScreen extends StatelessWidget {
               _showDeleteProfileDialog(context);
             },
           ),
-          const Divider(height: 1),
+          const Divider(height: 1, color: Color(0xFFE0E0E0)),
           ListTile(
             tileColor: Colors.white,
             leading: Icon(Icons.help, color: context.appPrimaryColor),
@@ -106,7 +106,7 @@ class AccountSettingsScreen extends StatelessWidget {
               }
             },
           ),
-          const Divider(height: 1),
+          const Divider(height: 1, color: Color(0xFFE0E0E0)),
         ],
       ),
     );

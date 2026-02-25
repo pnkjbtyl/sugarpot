@@ -225,7 +225,7 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
                 });
                   },
                 ),
-                const Divider(height: 1),
+                const Divider(height: 1, color: Color(0xFFE0E0E0)),
               ],
             );
           },
@@ -501,7 +501,7 @@ class _MatchesScreenState extends State<MatchesScreen> with SingleTickerProvider
                 },
                   ),
                 ),
-                const Divider(height: 1),
+                const Divider(height: 1, color: Color(0xFFE0E0E0)),
               ],
             );
           },

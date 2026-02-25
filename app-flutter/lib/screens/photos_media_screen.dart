@@ -570,29 +570,35 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
         title: const Text('Photos & Media'),
         backgroundColor: context.appPrimaryColor,
         foregroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withOpacity(0.7),
-          indicatorColor: Colors.white,
-          onTap: (index) {
-            setState(() {}); // Refresh to show correct gallery
-          },
-          tabs: const [
-            Tab(text: 'Public Gallery'),
-            Tab(text: 'Locked Gallery'),
-          ],
-        ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildGalleryGrid(_publicMedia, 'public'),
-                _buildGalleryGrid(_lockedMedia, 'locked'),
-              ],
-            ),
+      body: Column(
+        children: [
+          TabBar(
+            controller: _tabController,
+            labelColor: context.appPrimaryColor,
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: context.appPrimaryColor,
+            onTap: (index) {
+              setState(() {}); // Refresh to show correct gallery
+            },
+            tabs: const [
+              Tab(text: 'Public Gallery'),
+              Tab(text: 'Locked Gallery'),
+            ],
+          ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildGalleryGrid(_publicMedia, 'public'),
+                      _buildGalleryGrid(_lockedMedia, 'locked'),
+                    ],
+                  ),
+          ),
+        ],
+      ),
       floatingActionButton: _isUploading
           ? FloatingActionButton(
               onPressed: null,
