@@ -4,6 +4,8 @@ const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Match = require('../models/Match');
+const Message = require('../models/Message');
+const Report = require('../models/Report');
 const Otp = require('../models/Otp');
 const { authenticateToken } = require('../middleware/auth');
 const { sendOTPEmail } = require('../services/emailService');
@@ -658,13 +660,15 @@ router.put('/toggle-profile-visibility', authenticateToken, async (req, res) => 
   }
 });
 
-// Delete user profile
+// Delete user profile (cascade: messages, matches, reports, otps for this user)
 router.delete('/delete-profile', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+
+    const userId = user._id;
 
     // Delete profile image if exists
     if (user.profileImage) {
@@ -676,8 +680,21 @@ router.delete('/delete-profile', authenticateToken, async (req, res) => {
       }
     }
 
-    // Delete user
-    await User.findByIdAndDelete(req.userId);
+    // Cascade: remove user from all related data before deleting the user
+    await Message.deleteMany({
+      $or: [{ senderId: userId }, { receiverId: userId }]
+    });
+    await Match.deleteMany({
+      $or: [{ user1: userId }, { user2: userId }]
+    });
+    await Report.deleteMany({
+      $or: [{ reporterId: userId }, { reportedUserId: userId }]
+    });
+    if (user.email) {
+      await Otp.deleteMany({ email: user.email.toLowerCase().trim() });
+    }
+
+    await User.findByIdAndDelete(userId);
 
     res.json({ message: 'Profile deleted successfully' });
   } catch (error) {

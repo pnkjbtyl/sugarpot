@@ -284,13 +284,20 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
-  // Get my matches
+  // Get my matches (returns list; on error throws so caller never gets a Map as list)
   Future<List<dynamic>> getMyMatches() async {
     final response = await http.get(
       Uri.parse('$baseUrl/matches/my-matches'),
       headers: await _getHeaders(),
     );
-    return jsonDecode(response.body);
+    final decoded = jsonDecode(response.body);
+    if (response.statusCode != 200) {
+      throw Exception(decoded is Map ? (decoded['message'] ?? 'Failed to load matches') : 'Failed to load matches');
+    }
+    if (decoded is! List) {
+      throw Exception('Invalid response: expected list of matches');
+    }
+    return decoded;
   }
 
   // Send heart request to a user

@@ -128,12 +128,13 @@ router.get('/my-matches', authenticateToken, async (req, res) => {
       lastMessages.map(m => [m._id.toString(), { messageText: m.messageText, messageType: m.messageType, sentAt: m.sentAt ? new Date(m.sentAt).toISOString() : null }])
     );
 
-    // Format matches to show the other user
+    // Format matches to show the other user (skip if either user was deleted and populate returned null)
     const formattedMatches = matches.map(match => {
-      const otherUser = match.user1._id.toString() === req.userId 
-        ? match.user2 
+      if (!match.user1 || !match.user2) return null;
+      const otherUser = match.user1._id.toString() === req.userId
+        ? match.user2
         : match.user1;
-      
+
       // Properly serialize user object
       const serializedUser = otherUser ? {
         _id: otherUser._id.toString(),
@@ -160,7 +161,7 @@ router.get('/my-matches', authenticateToken, async (req, res) => {
         createdAt: match.createdAt,
         lastMessage: lastMessage || null
       };
-    }).filter(m => m.user !== null); // Filter out any null users
+    }).filter(m => m != null && m.user !== null); // Filter out null entries (deleted user) or null user
 
     res.json(formattedMatches);
   } catch (error) {
@@ -336,12 +337,13 @@ router.get('/received-hearts', authenticateToken, async (req, res) => {
       console.log(`[RECEIVED-HEARTS] First match: user1=${matches[0].user1?._id}, user2=${matches[0].user2}, status=${matches[0].status}`);
     }
 
-    // Format to show the user who sent the heart request
+    // Format to show the user who sent the heart request (skip if sender was deleted)
     const formattedRequests = matches.map(match => {
       const user = match.user1;
+      if (!user) return null;
       return {
         matchId: match._id.toString(),
-        user: user ? {
+        user: {
           _id: user._id.toString(),
           id: user._id.toString(),
           name: user.name,
@@ -352,10 +354,10 @@ router.get('/received-hearts', authenticateToken, async (req, res) => {
           gender: user.gender,
           location: user.location,
           gallery: user.gallery
-        } : null,
+        },
         createdAt: match.createdAt
       };
-    }).filter(req => req.user !== null); // Filter out any null users
+    }).filter(req => req != null); // Filter out entries where sender was deleted
 
     console.log(`[RECEIVED-HEARTS] Returning ${formattedRequests.length} requests for page ${page}`);
 
