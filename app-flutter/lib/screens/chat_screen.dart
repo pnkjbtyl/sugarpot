@@ -45,7 +45,7 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ApiService _apiService = ApiService();
@@ -62,6 +62,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _displayUser = Map<String, dynamic>.from(widget.otherUser);
     FirebaseService.setCurrentChatMatchId(widget.matchId);
     FirebaseService.setOnMatchesScreen(false);
@@ -69,6 +70,24 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadClearedState();
     _initializeSocket();
     _loadSenderProfileIfNeeded();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (!mounted) return;
+    // When app resumes, reconnect if socket died while in background (e.g. Send was disabled)
+    if (state == AppLifecycleState.resumed) {
+      final needReconnect = (_socket == null || !_socket!.connected) && !_isLoading;
+      if (needReconnect) {
+        setState(() {
+          _connectionFailed = false;
+          _isLoading = true;
+        });
+        SocketService.disconnect();
+        _initializeSocket();
+      }
+    }
   }
 
   /// Re-request message history (e.g. when user taps notification for this same chat).
@@ -697,6 +716,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     FirebaseService.setCurrentChatMatchId(null);
     FirebaseService.unregisterChatRefresh(widget.matchId);
     FirebaseService.setOnMatchesScreen(true);
