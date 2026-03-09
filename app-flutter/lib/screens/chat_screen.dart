@@ -58,6 +58,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   late Map<String, dynamic> _displayUser;
   /// True when socket failed to connect or we never received message history.
   bool _connectionFailed = false;
+  /// When non-null, the next sent message will be a reply to this message.
+  Map<String, dynamic>? _replyingToMessage;
+  /// Keys for each message by sequenceId (for scroll-to-message when tapping reply quote).
+  final Map<int, GlobalKey> _messageKeys = {};
+  /// SequenceId of message to briefly highlight after scrolling from a reply tap.
+  int? _highlightedSequenceId;
+
+  GlobalKey _keyForSequenceId(int seqId) =>
+      _messageKeys.putIfAbsent(seqId, () => GlobalKey());
 
   @override
   void initState() {
@@ -188,6 +197,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         });
       });
 
+      // Listen for message unsent (hidden from both users)
+      _socket!.on('message_unsent', (data) {
+        if (!mounted) return;
+        final matchId = data['matchId']?.toString();
+        final sequenceId = data['sequenceId'];
+        if (matchId != widget.matchId || sequenceId == null) return;
+        setState(() {
+          _messages.removeWhere((msg) => msg['sequenceId'] == sequenceId);
+        });
+      });
+
       // Listen for message history
       _socket!.on('messages_history', (data) {
         setState(() {
@@ -258,6 +278,108 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _socket?.emit('mark_delivered', {'messageIds': messageIds});
   }
 
+  /// Scroll to the message with [sequenceId] and highlight it briefly (e.g. when tapping a reply quote).
+  void _scrollToMessage(int sequenceId) {
+    final key = _messageKeys[sequenceId];
+    final ctx = key?.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+      alignment: 0.2,
+    );
+    setState(() => _highlightedSequenceId = sequenceId);
+    Future.delayed(const Duration(milliseconds: 1800), () {
+      if (mounted) setState(() => _highlightedSequenceId = null);
+    });
+  }
+
+  /// Label for reply quote: text snippet, or "Photo"/"Video"/"Audio" with icon for media.
+  Widget _buildReplyQuoteLabel(String? messageType, String? snippet, {Color? textColor}) {
+    final type = (messageType ?? 'text').toString().toLowerCase();
+    final color = textColor ?? Colors.grey[600];
+    if (type == 'text' && snippet != null && snippet.toString().trim().isNotEmpty) {
+      return Text(
+        snippet.toString(),
+        style: TextStyle(fontSize: 13, color: color),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+    IconData iconData;
+    String label;
+    switch (type) {
+      case 'image':
+        iconData = Icons.image;
+        label = 'Photo';
+        break;
+      case 'video':
+        iconData = Icons.videocam;
+        label = 'Video';
+        break;
+      case 'audio':
+        iconData = Icons.audiotrack;
+        label = 'Audio';
+        break;
+      default:
+        iconData = Icons.chat_bubble_outline;
+        label = 'Message';
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(iconData, size: 18, color: color),
+        const SizedBox(width: 6),
+        Text(label, style: TextStyle(fontSize: 13, color: color)),
+      ],
+    );
+  }
+
+  void _showMessageOptions(BuildContext context, Map<String, dynamic> message, bool isMe, Color receivedTertiary) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.reply),
+              title: const Text('Reply'),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _replyingToMessage = {
+                    'sequenceId': message['sequenceId'],
+                    'messageText': message['messageText'],
+                    'messageType': message['messageType'],
+                    'replyToSnippet': message['replyToSnippet'] ?? message['messageText'],
+                    'replyToMessageType': message['replyToMessageType'] ?? message['messageType'],
+                  };
+                });
+              },
+            ),
+            if (isMe)
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Unsend'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  final sequenceId = message['sequenceId'];
+                  if (sequenceId != null && _socket != null && _socket!.connected) {
+                    _socket!.emit('unsend_message', {
+                      'matchId': widget.matchId,
+                      'sequenceId': sequenceId,
+                    });
+                  }
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
@@ -276,6 +398,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final currentUserId = authProvider.user?['id'] ?? authProvider.user?['_id'] ?? '';
     final receiverId = _displayUser['id'] ?? _displayUser['_id'] ?? '';
 
+    final replyToSeq = _replyingToMessage?['sequenceId'];
+    final replyToSnippet = _replyingToMessage?['replyToSnippet'] ?? _replyingToMessage?['messageText'];
+    final replyToMsgType = _replyingToMessage?['replyToMessageType'] ?? _replyingToMessage?['messageType'] ?? 'text';
+
     // Add temporary message to UI immediately
     final tempMessage = {
       'id': null,
@@ -288,10 +414,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       'deliveredAt': null,
       'senderId': currentUserId.toString(),
       'receiverId': receiverId.toString(),
+      if (replyToSeq != null) 'replyToSequenceId': replyToSeq,
+      if (replyToSnippet != null) 'replyToSnippet': replyToSnippet is String ? replyToSnippet : replyToSnippet?.toString(),
+      if (replyToMsgType != null) 'replyToMessageType': replyToMsgType,
     };
 
     setState(() {
       _messages.add(tempMessage);
+      _replyingToMessage = null;
     });
     if (messageType == null) {
       _messageController.clear();
@@ -304,6 +434,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       'receiverId': receiverId,
       'messageType': messageType ?? 'text',
       'messageText': text,
+      if (replyToSeq != null) 'replyToSequenceId': replyToSeq,
     });
   }
 
@@ -587,6 +718,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           title: const Text('Report User'),
           content: SingleChildScrollView(
             child: Column(
@@ -600,6 +732,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     title: Text(reason),
                     value: reason,
                     groupValue: selectedReason,
+                    tileColor: Colors.transparent,
                     onChanged: (value) {
                       setDialogState(() {
                         selectedReason = value!;
@@ -726,6 +859,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _socket?.off('message_sent');
     _socket?.off('message_delivered');
     _socket?.off('messages_history');
+    _socket?.off('message_unsent');
     _socket?.off('error');
     _socket?.off('disconnect');
     super.dispose();
@@ -1225,49 +1359,100 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           // Received messages use sender's (other user's) gender tertiary color
                           final receivedTertiary = AppColors.fromGender(_displayUser['gender']).tertiary;
 
-                          return Align(
-                            alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                maxWidth: MediaQuery.of(context).size.width * 0.75,
-                              ),
-                              child: Container(
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 4,
+                          final replyToSnippet = message['replyToSnippet'];
+                          final replyToMessageType = message['replyToMessageType'] ?? 'text';
+                          final sequenceId = message['sequenceId'] is int
+                              ? message['sequenceId'] as int
+                              : (message['sequenceId'] != null ? int.tryParse(message['sequenceId'].toString()) : null);
+                          final replyToSequenceId = message['replyToSequenceId'] is int
+                              ? message['replyToSequenceId'] as int?
+                              : (message['replyToSequenceId'] != null ? int.tryParse(message['replyToSequenceId'].toString()) : null);
+                          final isHighlighted = sequenceId != null && sequenceId == _highlightedSequenceId;
+
+                          return GestureDetector(
+                            key: sequenceId != null ? _keyForSequenceId(sequenceId) : null,
+                            onLongPress: () => _showMessageOptions(context, message, isMe, receivedTertiary),
+                            child: Align(
+                              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth: MediaQuery.of(context).size.width * 0.75,
                                 ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                              decoration: BoxDecoration(
-                                color: isMe ? context.appTertiaryColor : receivedTertiary,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                                child: Column(
-                                  crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    _buildMessageContent(message, isMe, receivedTertiary: receivedTertiary),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        if (sentAt != null)
-                                          Text(
-                                            _formatTime(sentAt),
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: isMe
-                                                  ? Colors.black54
-                                                  : Colors.black54,
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 4,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isMe ? context.appTertiaryColor : receivedTertiary,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: isHighlighted
+                                        ? Border.all(color: context.appPrimaryColor, width: 2)
+                                        : null,
+                                    boxShadow: isHighlighted
+                                        ? [BoxShadow(color: context.appPrimaryColor.withValues(alpha: 0.4), blurRadius: 8, spreadRadius: 0)]
+                                        : null,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (replyToSnippet != null || replyToMessageType != 'text')
+                                        GestureDetector(
+                                          onTap: () {
+                                            if (replyToSequenceId != null) _scrollToMessage(replyToSequenceId);
+                                          },
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(bottom: 6),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                              decoration: BoxDecoration(
+                                                color: (isMe ? Colors.grey : Colors.grey).withValues(alpha: 0.14),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Icon(Icons.reply, size: 16, color: (isMe ? Colors.grey[600] : Colors.grey[600])),
+                                                  const SizedBox(width: 6),
+                                                  Flexible(
+                                                    child: _buildReplyQuoteLabel(
+                                                      replyToMessageType,
+                                                      replyToSnippet?.toString(),
+                                                      textColor: (isMe ? Colors.grey[600] : Colors.grey[600]),//.withValues(alpha: 0.85),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                           ),
-                                        const SizedBox(width: 4),
-                                        _buildMessageStatus(message),
-                                      ],
-                                    ),
-                                  ],
+                                        ),
+                                      _buildMessageContent(message, isMe, receivedTertiary: receivedTertiary),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (sentAt != null)
+                                            Text(
+                                              _formatTime(sentAt),
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: isMe
+                                                    ? Colors.black54
+                                                    : Colors.black54,
+                                              ),
+                                            ),
+                                          const SizedBox(width: 4),
+                                          _buildMessageStatus(message),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -1295,45 +1480,79 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   ),
                 ],
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    icon: _isUploading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(Icons.attach_file, color: context.appPrimaryColor),
-                    onPressed: (_isUploading || _connectionFailed || _socket == null || !_socket!.connected)
-                        ? null
-                        : _pickAndUploadFile,
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      decoration: const InputDecoration(
-                        hintText: 'Type a message...',
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
+                  if (_replyingToMessage != null)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: context.appPrimaryColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.reply, size: 20, color: context.appPrimaryColor),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildReplyQuoteLabel(
+                              _replyingToMessage!['replyToMessageType'] ?? _replyingToMessage!['messageType'],
+                              _replyingToMessage!['replyToSnippet']?.toString() ?? _replyingToMessage!['messageText']?.toString(),
+                              textColor: Colors.grey[600],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            onPressed: () => setState(() => _replyingToMessage = null),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: _isUploading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Icon(Icons.attach_file, color: context.appPrimaryColor),
+                        onPressed: (_isUploading || _connectionFailed || _socket == null || !_socket!.connected)
+                            ? null
+                            : _pickAndUploadFile,
+                      ),
+                      Expanded(
+                        child: TextField(
+                          controller: _messageController,
+                          decoration: const InputDecoration(
+                            hintText: 'Type a message...',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                          ),
+                          onSubmitted: (_) => _sendMessage(),
                         ),
                       ),
-                      onSubmitted: (_) => _sendMessage(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: Icon(
-                      Icons.send,
-                      color: (_connectionFailed || _socket == null || !_socket!.connected)
-                          ? Colors.grey
-                          : context.appPrimaryColor,
-                    ),
-                    onPressed: (_connectionFailed || _socket == null || !_socket!.connected)
-                        ? null
-                        : _sendMessage,
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: Icon(
+                          Icons.send,
+                          color: (_connectionFailed || _socket == null || !_socket!.connected)
+                              ? Colors.grey
+                              : context.appPrimaryColor,
+                        ),
+                        onPressed: (_connectionFailed || _socket == null || !_socket!.connected)
+                            ? null
+                            : _sendMessage,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1684,7 +1903,7 @@ class _AudioMessageWidgetState extends State<_AudioMessageWidget> {
         maxWidth: 250,
       ),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(0),
         decoration: BoxDecoration(
           color: widget.isMe ? context.appTertiaryColor : (widget.receivedBubbleColor ?? Colors.grey[400]),
           borderRadius: BorderRadius.circular(8),

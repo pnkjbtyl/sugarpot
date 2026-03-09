@@ -54,6 +54,25 @@ const messageSchema = new mongoose.Schema({
   },
   readAt: {
     type: Date
+  },
+  // Unsend: when true, message is hidden from both users (only admins can see)
+  hidden: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  // Reply: reference to the message being replied to (same match)
+  replyToSequenceId: {
+    type: Number,
+    default: null
+  },
+  replyToSnippet: {
+    type: String,
+    default: null
+  },
+  replyToMessageType: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true

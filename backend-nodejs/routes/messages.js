@@ -25,8 +25,8 @@ router.get('/:matchId', authenticateToken, async (req, res) => {
       return res.status(403).json({ message: 'Not authorized for this match' });
     }
 
-    // Build query
-    const query = { matchId };
+    // Build query (exclude unsent/hidden messages for clients)
+    const query = { matchId, hidden: { $ne: true } };
     if (beforeSequenceId) {
       query.sequenceId = { $lt: beforeSequenceId };
     }
@@ -45,7 +45,10 @@ router.get('/:matchId', authenticateToken, async (req, res) => {
       sentAt: msg.sentAt.toISOString(),
       deliveredAt: msg.deliveredAt ? msg.deliveredAt.toISOString() : null,
       senderId: msg.senderId.toString(),
-      receiverId: msg.receiverId.toString()
+      receiverId: msg.receiverId.toString(),
+      replyToSequenceId: msg.replyToSequenceId ?? null,
+      replyToSnippet: msg.replyToSnippet ?? null,
+      replyToMessageType: msg.replyToMessageType ?? null
     }));
 
     res.json(messagesPayload);

@@ -115,7 +115,7 @@ router.get('/my-matches', authenticateToken, async (req, res) => {
 
     const matchIds = matches.map(m => m._id);
     const lastMessages = await Message.aggregate([
-      { $match: { matchId: { $in: matchIds } } },
+      { $match: { matchId: { $in: matchIds }, hidden: { $ne: true } } },
       { $sort: { sentAt: -1 } },
       { $group: {
         _id: '$matchId',

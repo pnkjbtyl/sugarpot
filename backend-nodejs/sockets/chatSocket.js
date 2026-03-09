@@ -53,7 +53,7 @@ module.exports = (io) => {
     // Send message
     socket.on('send_message', async (data) => {
       try {
-        const { matchId, receiverId, messageType, messageText } = data;
+        const { matchId, receiverId, messageType, messageText, replyToSequenceId } = data;
 
         // Validate match exists and user is part of it
         const match = await Match.findById(matchId);
@@ -78,6 +78,25 @@ module.exports = (io) => {
           return;
         }
 
+        // Resolve reply-to: get snippet from original message if not hidden
+        let replyToSnippet = null;
+        let replyToMessageType = null;
+        if (replyToSequenceId != null) {
+          const original = await Message.findOne({
+            matchId,
+            sequenceId: replyToSequenceId,
+            hidden: { $ne: true }
+          }).lean();
+          if (original) {
+            replyToMessageType = original.messageType || 'text';
+            if (original.messageType === 'text') {
+              replyToSnippet = (original.messageText || '').substring(0, 200);
+            } else {
+              replyToSnippet = `[${original.messageType}]`;
+            }
+          }
+        }
+
         // Get next IDs
         const messageId = await getNextMessageId();
         const sequenceId = await getNextSequenceId(matchId);
@@ -93,7 +112,10 @@ module.exports = (io) => {
           messageText,
           isSent: true,
           isDelivered: false,
-          sentAt: new Date()
+          sentAt: new Date(),
+          replyToSequenceId: replyToSequenceId ?? undefined,
+          replyToSnippet: replyToSnippet ?? undefined,
+          replyToMessageType: replyToMessageType ?? undefined
         });
 
         await message.save();
@@ -109,7 +131,10 @@ module.exports = (io) => {
           sentAt: message.sentAt.toISOString(),
           deliveredAt: message.deliveredAt ? message.deliveredAt.toISOString() : null,
           senderId: senderId.toString(),
-          receiverId: receiverId.toString()
+          receiverId: receiverId.toString(),
+          replyToSequenceId: message.replyToSequenceId ?? null,
+          replyToSnippet: message.replyToSnippet ?? null,
+          replyToMessageType: message.replyToMessageType ?? null
         };
 
         // Emit to sender (confirmation)
@@ -163,6 +188,48 @@ module.exports = (io) => {
       } catch (error) {
         console.error('Error sending message:', error);
         socket.emit('error', { message: 'Failed to send message', error: error.message });
+      }
+    });
+
+    // Unsend (hide) a message from both users
+    socket.on('unsend_message', async (data) => {
+      try {
+        const { matchId, sequenceId } = data;
+
+        const match = await Match.findById(matchId);
+        if (!match) {
+          socket.emit('error', { message: 'Match not found' });
+          return;
+        }
+
+        const isUser1 = match.user1.toString() === userId.toString();
+        const isUser2 = match.user2.toString() === userId.toString();
+        if (!isUser1 && !isUser2) {
+          socket.emit('error', { message: 'Not authorized for this match' });
+          return;
+        }
+
+        const message = await Message.findOne({ matchId, sequenceId });
+        if (!message) {
+          socket.emit('error', { message: 'Message not found' });
+          return;
+        }
+
+        if (message.senderId.toString() !== userId.toString()) {
+          socket.emit('error', { message: 'Only the sender can unsend this message' });
+          return;
+        }
+
+        message.hidden = true;
+        await message.save();
+
+        const receiverId = isUser1 ? match.user2 : match.user1;
+        const payload = { matchId: String(matchId), sequenceId };
+        socket.emit('message_unsent', payload);
+        io.to(`user_${receiverId}`).emit('message_unsent', payload);
+      } catch (error) {
+        console.error('Error unsending message:', error);
+        socket.emit('error', { message: 'Failed to unsend message', error: error.message });
       }
     });
 
@@ -241,8 +308,8 @@ module.exports = (io) => {
           return;
         }
 
-        // Build query
-        const query = { matchId };
+        // Build query (exclude hidden/unsent messages)
+        const query = { matchId, hidden: { $ne: true } };
         if (beforeSequenceId) {
           query.sequenceId = { $lt: beforeSequenceId };
         }
@@ -261,7 +328,10 @@ module.exports = (io) => {
           sentAt: msg.sentAt.toISOString(),
           deliveredAt: msg.deliveredAt ? msg.deliveredAt.toISOString() : null,
           senderId: msg.senderId.toString(),
-          receiverId: msg.receiverId.toString()
+          receiverId: msg.receiverId.toString(),
+          replyToSequenceId: msg.replyToSequenceId ?? null,
+          replyToSnippet: msg.replyToSnippet ?? null,
+          replyToMessageType: msg.replyToMessageType ?? null
         }));
 
         socket.emit('messages_history', messagesPayload);

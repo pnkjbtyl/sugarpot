@@ -285,11 +285,13 @@ class _PhotosMediaScreenState extends State<PhotosMediaScreen> with SingleTicker
             ListTile(
               leading: const Icon(Icons.photo),
               title: const Text('Image'),
+              tileColor: Colors.transparent,
               onTap: () => Navigator.pop(context, 'image'),
             ),
             ListTile(
               leading: const Icon(Icons.videocam),
               title: const Text('Video'),
+              tileColor: Colors.transparent,
               onTap: () => Navigator.pop(context, 'video'),
             ),
           ],

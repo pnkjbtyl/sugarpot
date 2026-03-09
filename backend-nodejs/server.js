@@ -119,4 +119,10 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Socket.io server initialized`);
+}).on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is already in use. Stop the other process (e.g. lsof -i :${PORT}) or set PORT to a different value.`);
+    process.exit(1);
+  }
+  throw err;
 });
