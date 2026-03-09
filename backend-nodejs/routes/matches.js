@@ -7,6 +7,16 @@ const User = require('../models/User');
 const { authenticateToken } = require('../middleware/auth');
 const { sendHeartRequestNotification, sendHeartAcceptedNotification } = require('../services/fcmService');
 
+async function getNextMessageId() {
+  const lastMessage = await Message.findOne().sort({ id: -1 }).limit(1);
+  return lastMessage ? lastMessage.id + 1 : 1;
+}
+
+async function getNextSequenceId(matchId) {
+  const lastMessage = await Message.findOne({ matchId }).sort({ sequenceId: -1 }).limit(1);
+  return lastMessage ? lastMessage.sequenceId + 1 : 1;
+}
+
 // Swipe right (like) on a user
 router.post('/swipe', authenticateToken, async (req, res) => {
   try {
@@ -228,6 +238,28 @@ router.post('/heart-request', authenticateToken, async (req, res) => {
         match.status = 'matched';
         match.updatedAt = Date.now();
         await match.save();
+
+        // Add heart sender's pickup line as the first message from them to the accepter
+        const senderId = match.user1;
+        const receiverId = match.user2;
+        const sender = await User.findById(senderId).select('pickupLine').lean();
+        const pickupLine = (sender?.pickupLine && String(sender.pickupLine).trim()) || 'Hi! Thanks for accepting my heart ❤️';
+        const messageId = await getNextMessageId();
+        const sequenceId = await getNextSequenceId(match._id);
+        const firstMessage = new Message({
+          id: messageId,
+          matchId: match._id,
+          senderId,
+          receiverId,
+          sequenceId,
+          messageType: 'text',
+          messageText: pickupLine,
+          isSent: true,
+          isDelivered: false,
+          sentAt: new Date()
+        });
+        await firstMessage.save();
+
         // Notify the heart sender (user1) that their request was accepted
         await sendHeartAcceptedToSender(match.user1.toString(), req.userId, match._id.toString());
         return res.json({
